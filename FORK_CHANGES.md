@@ -12,5 +12,8 @@
 | `androidApp/src/main/AndroidManifest.xml` | アプリ名(`android:label`)を `Tailfeed` に変更 | 0a |
 | `androidApp/src/release/res/drawable/ic_launcher_background.xml` | 背景のグラデーションを青から緑系に変更 | 0a |
 | `androidApp/src/debug/res/drawable/ic_launcher_background.xml` | 背景のグラデーションを橙から紫系に変更 | 0a |
+| `.gitignore` | 0c の評価用の訳文(記事本文を含む)の出力先 `docs/spike/eval-out/` を除外 | 0c |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
+
+新規に足したもの(既存ファイルの変更ではない): `.gitmodules` と submodule `third_party/llama.cpp`(タグ `b12360`)、翻訳スパイクの検証アプリ `spike/translate/`(フォーク本体のビルドには含めない)。
