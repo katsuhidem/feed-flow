@@ -1,10 +1,11 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。0aのビルド設定と、ID、名前、アイコンの差し替え)
+最終更新: 2026-11-14(エージェント。0aの実機確認の結果を記録)
 
 ## 現在地
 
-- フェーズ: 0a(作業中。ブランチ phase/0a)
+- フェーズ: 0a。完了条件(実機で購読一覧と未読記事が同期され、既読がFreshRSSに反映される)は満たした。チェックリストの残りは、上流のエージェント設定の整理だけ(ブランチ phase/0a)
+- 0aの基準線: phase/0a のこのコミット(fdroid debug、`io.github.katsuhidem.feedflow.debug`)
 - 0aのチェックリストの進み具合(PLAN のチェックボックスは未更新):
   - 済: フォークと main の作成、upstream の追加(0a以前)
   - 済: `config/dummy-google-services.json` を debug と release に `google-services.json` としてコピー(gitignore の対象で、コミットされない)
@@ -14,22 +15,24 @@
   - 済: FreshRSS の構築(人)
   - 未: 上流のエージェント設定の残り(`.github/workflows`、`renovate.json`)。下の「未解決の点」の1で止めている
   - 済: 実機への導入(2026-11-14 18:50)。`adb install -r` が Success。`pm list packages` に `io.github.katsuhidem.feedflow.debug` が1行出る。起動して MainActivity が表示され、crash バッファは空
-  - 未: 同期の確認(HUMAN_TASKS 6節の手順2〜4と確認)。人に依頼中
+  - 済: 同期の確認(HUMAN_TASKS 6節)。人が7項目を確認(下の「人からの連絡」)。エージェントの照合でも、アプリとFreshRSSの数が一致
 - 環境: docs/HUMAN_TASKS.md の1〜4節は完了。5節は確認2まで完了。確認3は一部だけ確認済み(下記)。
 - 端末のページサイズ: 4096
 - FreshRSSの公開: Tailscale Services の `svc:freshrss`。URLは `https://freshrss.<tailnet名>.ts.net`。Mac miniは `tag:service-host` 付きのホスト。`base_url` はこのURLと一致(2026-11-14 に確認)。
 
 ## 次の作業
 
-1. 6節の結果を受けて、0aの基準線をコミットする
-2. 上流のエージェント設定の残りの整理(「未解決の点」の1が決まってから)
+1. 上流のエージェント設定の残りの整理(「未解決の点」の1が決まってから)。これで0aのチェックリストが終わる
+2. 0b(tsnetスパイク)または0c(翻訳スパイク)に進む。どちらからでもよい(互いに依存しない)。0bは HUMAN_TASKS 7節「開始前の準備」が前提
 
 ## 人への依頼
 
-- APK は導入済みです。docs/HUMAN_TASKS.md 6節「Phase 0aの実機確認」の手順2〜4と確認を行ってください。報告してほしい結果は、確認の7項目それぞれの可否と、購読フィードの件数です。アプリに入れるURLは `https://freshrss.<tailnet名>.ts.net/api/greader.php` です。
 - 「未解決の点」の1(`.github/workflows` と `renovate.json` の扱い)を決めてください。
+- phase/0a を確認し、main へマージしてください。0aの基準線です。
 
 ## 人からの連絡
+
+- 2026-11-14: HUMAN_TASKS 6節を一通り確認し、問題なさそう。
 
 - 2026-11-14: URLは端末名ではなく freshrss のサービスにした。それが正になるように計画を書き直す。
 
@@ -40,6 +43,8 @@
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
 
 ## 確認の記録
+
+- 2026-11-14 19:01: 人の6節の確認の後、アプリのDB(run-as で複製)と FreshRSS の `cli/user-info.php` を照合。購読フィード 3 と 3、既読 37 と 37、未読 13 と 13 で一致。3件のフィードのアイコンURLは、すべてサービスのURLで始まる。アプリの既読の送信待ちは 0 件。Tailscale を切断したときの失敗は、人の確認だけで、エージェントは確かめていない。
 
 - 2026-11-14 18:50: 端末は adb で `device`、Android 17、ページサイズ 4096。最初は USB デバッグの口(ADB インターフェース)が出ておらず、人が端末で USB デバッグを入れ直して解消した。
 
