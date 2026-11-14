@@ -13,21 +13,20 @@
   - 済: `./gradlew --quiet --console=plain :androidApp:assembleFdroidDebug` が通る(2026-11-14 18:45)。aapt2 で、package `io.github.katsuhidem.feedflow.debug`、label `Tailfeed`、targetSdk 36 を確認
   - 済: FreshRSS の構築(人)
   - 未: 上流のエージェント設定の残り(`.github/workflows`、`renovate.json`)。下の「未解決の点」の1で止めている
-  - 未: 実機への導入と同期の確認(HUMAN_TASKS 6節)。`adb devices` に端末が出ず、導入できていない
+  - 済: 実機への導入(2026-11-14 18:50)。`adb install -r` が Success。`pm list packages` に `io.github.katsuhidem.feedflow.debug` が1行出る。起動して MainActivity が表示され、crash バッファは空
+  - 未: 同期の確認(HUMAN_TASKS 6節の手順2〜4と確認)。人に依頼中
 - 環境: docs/HUMAN_TASKS.md の1〜4節は完了。5節は確認2まで完了。確認3は一部だけ確認済み(下記)。
 - 端末のページサイズ: 4096
 - FreshRSSの公開: Tailscale Services の `svc:freshrss`。URLは `https://freshrss.<tailnet名>.ts.net`。Mac miniは `tag:service-host` 付きのホスト。`base_url` はこのURLと一致(2026-11-14 に確認)。
 
 ## 次の作業
 
-1. Fold8 がつながったら、`adb install -r androidApp/build/outputs/apk/fdroid/debug/androidApp-fdroid-debug.apk` で導入し、`adb shell pm list packages | grep io.github.katsuhidem.feedflow` で1行出ることを確かめる
+1. 6節の結果を受けて、0aの基準線をコミットする
 2. 上流のエージェント設定の残りの整理(「未解決の点」の1が決まってから)
-3. 6節の結果を受けて、0aの基準線をコミットする
 
 ## 人への依頼
 
-- Fold8 を USB でつなぎ、`adb devices` に `device` と出る状態にしてください(2026-11-14 18:45 の時点では端末が出ていません)。つないだら、エージェントが APK を導入します。
-- 導入の後に、docs/HUMAN_TASKS.md 6節「Phase 0aの実機確認」の手順2〜4と確認を行ってください。報告してほしい結果は、確認の7項目それぞれの可否と、購読フィードの件数です。アプリに入れるURLは `https://freshrss.<tailnet名>.ts.net/api/greader.php` です。
+- APK は導入済みです。docs/HUMAN_TASKS.md 6節「Phase 0aの実機確認」の手順2〜4と確認を行ってください。報告してほしい結果は、確認の7項目それぞれの可否と、購読フィードの件数です。アプリに入れるURLは `https://freshrss.<tailnet名>.ts.net/api/greader.php` です。
 - 「未解決の点」の1(`.github/workflows` と `renovate.json` の扱い)を決めてください。
 
 ## 人からの連絡
@@ -41,6 +40,8 @@
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
 
 ## 確認の記録
+
+- 2026-11-14 18:50: 端末は adb で `device`、Android 17、ページサイズ 4096。最初は USB デバッグの口(ADB インターフェース)が出ておらず、人が端末で USB デバッグを入れ直して解消した。
 
 - 2026-11-14 18:26: HUMAN_TASKS 2節と5節確認1の読み取りコマンドはすべて期待どおり。curl はサービスのURLで 200、マシン名のURLでは接続できない。
 - 2026-11-14 18:26: 5節確認3の1項目目に当たる確認。`/tmp/FreshRSS.log` は 18:13 に更新され、ユーザーの更新が OK で終わっている。再起動の2項目は未実施。
