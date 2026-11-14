@@ -1,0 +1,10 @@
+https://webkit.org/blog/18608/safari-on-apple-homeview/
+https://www.vlt.io/blog/act-accordingly
+https://vercel.com/changelog/gemini-4-hydrogen-now-available-on-ai-gateway
+https://www.aikido.dev/blog/upwind-security-alternatives
+https://eslint.org/blog/2026/11/eslint-v10.15.0-released/
+https://www.stepsecurity.io/blog/accurasofthire-fake-interview-developer-machines
+https://www.aikido.dev/blog/top-qualys-alternatives
+https://www.stepsecurity.io/blog/cve-2026-126187-react-flight-rce
+https://blog.cloudflare.com/adapting-to-ai-penetration-testing-orchestrators/
+https://vercel.com/blog/workflow-sdk-5
