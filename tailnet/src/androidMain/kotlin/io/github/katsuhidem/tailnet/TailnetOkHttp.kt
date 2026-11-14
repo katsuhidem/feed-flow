@@ -24,7 +24,6 @@ import java.net.SocketAddress
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -35,13 +34,12 @@ import kotlin.time.Duration.Companion.seconds
 fun OkHttpClient.Builder.applyTailnet(
     manager: TailnetManager,
     ensureTimeout: Duration = 45.seconds,
-    maxHold: Duration = 3.minutes,
 ): OkHttpClient.Builder {
     val pool = ConnectionPool()
     manager.registerPool(pool)
     return connectionPool(pool)
         .proxySelector(TailnetProxySelector(manager))
-        .addInterceptor(TailnetGateInterceptor(manager, ensureTimeout, maxHold))
+        .addInterceptor(TailnetGateInterceptor(manager, ensureTimeout))
         .proxyAuthenticator(TailnetProxyAuthenticator(manager))
 }
 
@@ -91,7 +89,6 @@ class TailnetProxySelector(private val manager: TailnetManager) : ProxySelector(
 class TailnetGateInterceptor(
     private val manager: TailnetManager,
     private val ensureTimeout: Duration,
-    private val maxHold: Duration,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -104,7 +101,7 @@ class TailnetGateInterceptor(
         }
 
         val responseRef = AtomicReference<Response?>(null)
-        val lease = manager.acquire(maxHold) {
+        val lease = manager.acquire(manager.leaseMaxHold()) {
             chain.call().cancel()
             responseRef.get()?.close()
         }

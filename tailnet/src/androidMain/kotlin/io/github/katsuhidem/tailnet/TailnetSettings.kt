@@ -15,7 +15,19 @@ class TailnetSettings(context: Context) {
         get() = prefs.getString(KEY_NODE_NAME, null) ?: DEFAULT_NODE_NAME
         set(value) = prefs.edit().putString(KEY_NODE_NAME, value).apply()
 
+    /** Debug builds only: 10 s stop delay, for the Phase 1 checks. */
+    var debugShortStop: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_STOP, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_STOP, value).apply()
+
+    /** Debug builds only: 0.5 s lease limit, for the Phase 1 checks. */
+    var debugShortLease: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_LEASE, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_LEASE, value).apply()
+
     private companion object {
+        const val KEY_DEBUG_STOP = "debug_short_stop"
+        const val KEY_DEBUG_LEASE = "debug_short_lease"
         const val KEY_MODE = "mode"
         const val KEY_NODE_NAME = "node_name"
         const val DEFAULT_NODE_NAME = "tailfeed"

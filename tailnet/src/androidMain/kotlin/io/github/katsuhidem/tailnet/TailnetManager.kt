@@ -50,7 +50,6 @@ class TailnetManager(
     context: Context,
     private val settings: TailnetSettings,
     private val targetUrl: () -> String?,
-    private val stopDelay: Duration = 3.minutes,
 ) : TailnetController {
 
     private val appContext = context.applicationContext
@@ -91,7 +90,11 @@ class TailnetManager(
             if (s == "running") applyTarget()
         }
 
-        override fun log(line: String) = log.d { line }
+        override fun log(line: String) {
+            // The login URL is single-use but still a credential; keep it out of logcat.
+            if (line.contains("login.tailscale.com") || line.startsWith("To start this tsnet")) return
+            log.d { line }
+        }
     }
 
     /** Call once from Application.onCreate. */
@@ -205,6 +208,25 @@ class TailnetManager(
         pools += pool
     }
 
+    /** Debug builds only: short stop delay (10 s) for the Phase 1 checks. */
+    var debugShortStop: Boolean
+        get() = settings.debugShortStop
+        set(value) {
+            settings.debugShortStop = value
+        }
+
+    /** Debug builds only: short lease limit (0.5 s) for the Phase 1 checks. */
+    var debugShortLease: Boolean
+        get() = settings.debugShortLease
+        set(value) {
+            settings.debugShortLease = value
+        }
+
+    /** Upper limit for holding a lease per request. Shortened only by the debug test option. */
+    fun leaseMaxHold(): Duration = if (settings.debugShortLease) DEBUG_MAX_HOLD else DEFAULT_MAX_HOLD
+
+    private fun stopDelay(): Duration = if (settings.debugShortStop) DEBUG_STOP_DELAY else DEFAULT_STOP_DELAY
+
     // ---- internals ----
 
     private data class Target(val scheme: String, val host: String, val port: Int)
@@ -244,8 +266,9 @@ class TailnetManager(
         if (foreground || leases.get() > 0 || !running) return
         synchronized(this) {
             stopJob?.cancel()
+            log.i { "no leases in background; stopping in ${stopDelay()}" }
             stopJob = scope.launch {
-                delay(stopDelay)
+                delay(stopDelay())
                 if (!foreground && leases.get() == 0) stop()
             }
         }
@@ -258,7 +281,15 @@ class TailnetManager(
         }
     }
 
+    /** Closing pooled TLS sockets does network I/O, so never on the main thread. */
     private fun evictPools() {
-        pools.forEach { it.evictAll() }
+        scope.launch(Dispatchers.IO) { pools.forEach { it.evictAll() } }
+    }
+
+    private companion object {
+        val DEFAULT_STOP_DELAY = 3.minutes
+        val DEFAULT_MAX_HOLD = 3.minutes
+        val DEBUG_STOP_DELAY = kotlin.time.Duration.parse("10s")
+        val DEBUG_MAX_HOLD = kotlin.time.Duration.parse("500ms")
     }
 }

@@ -15,6 +15,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.prof18.feedflow.android.BuildConfig
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +86,10 @@ internal fun TailnetSection(manager: TailnetManager, modifier: Modifier = Modifi
                 is TailnetState.Connected -> OutlinedButton(onClick = { manager.stop() }) { Text("切断") }
                 TailnetState.Starting -> Unit
             }
+            if (BuildConfig.DEBUG) {
+                DebugSwitch("検証用: 停止まで10秒", manager.debugShortStop) { manager.debugShortStop = it }
+                DebugSwitch("検証用: 印の上限0.5秒", manager.debugShortLease) { manager.debugShortLease = it }
+            }
         }
         HorizontalDivider()
     }
@@ -94,4 +102,19 @@ private fun statusText(state: TailnetState): String = when (state) {
         if (state.authUrl == null) "ログインの準備中…" else "ログインが必要です。ログインして承認したら、このアプリに戻ってください。"
     is TailnetState.Connected -> "接続済み(${state.ip})"
     is TailnetState.Error -> "エラー: ${state.message}"
+}
+
+@Composable
+private fun DebugSwitch(label: String, initial: Boolean, onChange: (Boolean) -> Unit) {
+    var checked by remember { mutableStateOf(initial) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text = label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                checked = it
+                onChange(it)
+            },
+        )
+    }
 }
