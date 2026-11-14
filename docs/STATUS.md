@@ -1,10 +1,10 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。0b 完了。人の判定で tsnet の埋め込みを採用)
+最終更新: 2026-11-14(エージェント。Mac mini の再起動確認を記録し、Phase 1 のブランチを作成)
 
 ## 現在地
 
-- フェーズ: Phase 0 完了(0a、0b、0c、HUMAN_TASKS 9節。ブランチ phase/0c で main へのマージ待ち)。結果は docs/PLAN.md「Phase 0 の結果」。未確認は Mac mini の再起動後の条件だけ。次は Phase 1(Tailscale 統合)記録は docs/spike/TRANSLATE_LOG.md
+- フェーズ: Phase 1(未着手。ブランチ phase/1)。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
 - 0b: 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
   - 計測値: 起動から疎通まで、初回 2.9〜3.4 秒、同じプロセスでの再起動 4.3〜5.0 秒、永続ノードのアプリ再起動 2.7〜2.8 秒、端末の再起動後 3.2 秒。回線切替からの回復 4.9〜8.8 秒(4回)。AAR 8.2MB(arm64)
@@ -22,22 +22,21 @@
   - 済: FreshRSS の構築(人)
   - 済: 実機への導入(2026-11-14 18:50)。`adb install -r` が Success。`pm list packages` に `io.github.katsuhidem.feedflow.debug` が1行出る。起動して MainActivity が表示され、crash バッファは空
   - 済: 同期の確認(HUMAN_TASKS 6節)。人が7項目を確認(下の「人からの連絡」)。エージェントの照合でも、アプリとFreshRSSの数が一致
-- 環境: docs/HUMAN_TASKS.md の1〜4節と6節は完了。5節は確認2まで完了。確認3は一部だけ確認済み(下記)。
+- 環境: docs/HUMAN_TASKS.md の1〜9節は完了(8節の「端末の熱さ」の1項目だけ未記録)。
 - 端末のページサイズ: 4096
 - FreshRSSの公開: Tailscale Services の `svc:freshrss`。URLは `https://freshrss.<tailnet名>.ts.net`。Mac miniは `tag:service-host` 付きのホスト。`base_url` はこのURLと一致(2026-11-14 に確認)。
 
 ## 次の作業
 
-1. phase/0c が main にマージされたら、Phase 1(Tailscale 統合)のブランチ phase/1 を切り、docs/PLAN.md の Phase 1 の節を読んで始める
-2. Mac mini の再起動確認の結果が届いたら、PLAN.md「Phase 0 の結果」の Mac mini の行を更新する
+1. docs/PLAN.md の Phase 1 の節を読み、Phase 0 の結果(持ち越す点)と合わせて作業を始める
 
 ## 人への依頼
 
-- phase/0c を確認し、main へマージしてください。Phase 0(0a、0b、0c)の記録がすべて入っています。
-- docs/HUMAN_TASKS.md 5節の確認3の後半2項目(Mac mini を再起動し、ログイン画面のままと、ログイン後に、Fold8 から公開用のURLが開けるか)を行ってください。報告してほしい結果: それぞれ開けたかどうか。PLAN.md「Phase 0 の結果」の Mac mini の行に記録します。
+- Mac mini の「停電後に自動的に起動」が、`pmset -g` では `autorestart 0`(オフ)でした。HUMAN_TASKS 2節の手順9ではオンにすることになっています。意図どおりか確かめ、オンにする場合はシステム設定 → エネルギー で有効にしてください。報告してほしい結果: `pmset -g | grep autorestart` の値。
 
 ## 人からの連絡
 
+- 2026-11-14: Mac mini を再起動した。ログイン画面のままでは Fold8 から接続できず、ログインして2〜3分たつと接続できた。phase/0c を main にマージした。
 - 2026-11-14: docs/PLAN.md「Phase 0 の結果」を読んで確かめた。問題なし。
 - 2026-11-14: HUMAN_TASKS 9節の手順1(`tsbridge-spike` の失効と authkey の削除)と手順2(ノード `tsb-spike` の削除)を行った。
 - 2026-11-14: 本文翻訳の既定は「通常 0.8B、高品質な翻訳だけ 2B に切り替え」。

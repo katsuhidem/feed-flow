@@ -221,8 +221,8 @@ curl -s -H "Authorization:GoogleLogin auth=$AUTH" \
 **確認3: 自動更新と再起動**
 
 - [x] 毎時13分か43分を過ぎた後、`docker exec freshrss cat /tmp/FreshRSS.log` にフィード更新の記録が出る。
-- [ ] Mac miniを再起動し、ログイン画面のままFold8から `$BASE/` を開く。開けるかどうかを記録する。
-- [ ] ログインして2〜3分待ち、操作なしでFold8から `$BASE/` が開ける。`tailscale serve status` に `svc:freshrss` の設定が残っていることも確かめる。開けない場合は、確認1のコマンドで止まっている箇所を調べる。
+- [x] Mac miniを再起動し、ログイン画面のままFold8から `$BASE/` を開く。開けるかどうかを記録する。
+- [x] ログインして2〜3分待ち、操作なしでFold8から `$BASE/` が開ける。`tailscale serve status` に `svc:freshrss` の設定が残っていることも確かめる。開けない場合は、確認1のコマンドで止まっている箇所を調べる。
 
 TailscaleのmacOSアプリは、ログイン前には動きません。停電後に無人で復帰させたい場合は、システム設定 → ユーザとグループ で自動ログインを設定します。自動ログインはFileVaultが有効だと使えず、本体に触れられる人がそのまま操作できる状態になるため、設置場所を踏まえて決めてください。
 

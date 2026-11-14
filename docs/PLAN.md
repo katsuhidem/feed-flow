@@ -331,7 +331,7 @@ Android 17のローカルネットワーク保護は、targetSdkが36のまま�
 | 端末 | Galaxy Z Fold8(SM-F971Q)、Android 17、ページサイズ 4096 |
 | 0cの結果 | タイトルの自動翻訳と本文の対訳は 0.8B を既定とし、高品質な翻訳だけ 2B に切り替える(人の判定)。0.8B: `pfnet/plamo-3-translate-0.8b-GGUF` の Q4\_K\_M、SHA-256 `70891ec70dc7ab4205745a38307867c2881b99239f20327927633abfe4bc9ec6`。2B: `pfnet/plamo-3-translate-2b-GGUF` の Q4\_K\_M、SHA-256 `1ffd9073afcc70e35ccc942428aa2b73d7aa2b9ea779bf504b775369e0276c13`。llama.cpp はタグ `b12360`。評価結果は docs/spike/eval-result.md、計測値は docs/spike/TRANSLATE_LOG.md |
 | コードの保護 | 方式は未決定。合成の入力では保護なし、プレースホルダ、glossary のいずれも 20/20 残ったが、実記事ではバッククォート内のパスや製品名が訳された。Phase 3 で保護を必須とし、実記事の段落で2方式を比べて決める |
-| Mac mini | 未確認。再起動後に使えるようになる条件(docs/HUMAN_TASKS.md 5節の確認3の後半2項目)はまだ確かめておらず、自動ログインも設定していない |
+| Mac mini | 再起動後、ログイン画面のままでは Fold8 から FreshRSS に届かない。ログインして2〜3分たつと、操作なしで届く(2026-11-14 確認。`svc:freshrss` の Serve 設定は再起動後も残る)。自動ログインは未設定で、FileVault が有効なため使えない。停電後の自動起動(`pmset` の `autorestart`)は 0(オフ) |
 
 Phase 1 と Phase 3 に持ち越す点:
 
