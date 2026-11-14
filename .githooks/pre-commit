@@ -1,0 +1,11 @@
+#!/bin/sh
+# 秘密情報に当たる文字列を含むコミットを止める。該当行は表示しない。
+staged=$(git diff --cached -U0 | grep '^+' | grep -v '^+++')
+list="$HOME/.config/tsbridge/denylist"
+hit=""
+if printf '%s\n' "$staged" | grep -E -q 'tskey-[a-z]+-[A-Za-z0-9]+'; then hit=1; fi
+if [ -s "$list" ] && printf '%s\n' "$staged" | grep -F -q -f "$list"; then hit=1; fi
+if [ -n "$hit" ]; then
+  echo "秘密情報に当たる文字列が含まれています。コミットを中止しました。" >&2
+  exit 1
+fi

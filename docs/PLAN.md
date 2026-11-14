@@ -1,0 +1,691 @@
+# FeedFlowフォーク RSSクライアント 実装計画
+
+Nov 13, 2026 · @MATSUI Katsuhide
+
+Phase 0で人が行う作業の具体的な手順は、別タブにまとめています: 人が行う作業
+
+## 前提と方針
+
+FeedFlowをリリースタグ `1.21.0-fdroid` で分岐し、Tailscale接続と端末内翻訳を独自モジュールとして足した、Android専用の個人用アプリを作ります。
+
+| 項目 | 決定 | 根拠 |
+| --- | --- | --- |
+| 上流との関係 | ハードフォーク。定期rebaseはせず、同期とセキュリティの修正だけcherry-pick | 上流は直近3か月で約820コミット。翻訳の差し込み箇所(`ReaderModeViewModel` 18回、DBスキーマ20回)が特に動く |
+| 対象OS | Androidを先行し、iOSはPhase 5で対応 | ロジックはKMPの共通コードに置き、iOS対応時の作り直しを避ける。デスクトップは対象外 |
+| 配布 | 自分の端末のみ | 商標・ライセンス表示・モデル利用登録の要件が最小で済む |
+| ベース | `fdroid` flavor | Firebase、RevenueCat、Play Servicesへの依存がない |
+| Tailscale | tsnetをGoブリッジで埋め込み、loopbackにHTTPプロキシを立て、宛先をFreshRSSホストに限定する | AndroidのVPN枠を使わず、同期URLを書き換えずに済み、Kotlin側はOkHttpのプロキシ設定だけで足りる |
+| 翻訳エンジン | llama.cppを薄い自作JNIで組み込む | PLaMo 3は独自のプロンプト形式で、生プロンプトとstop列の指定が必須 |
+| 翻訳モデル | `plamo-3-translate-0.8b` GGUF Q4\_K\_M(0.57GB) | スマホ向けの最小サイズ。2BのQ4\_K\_M(1.81GB)も0cで計測し、速度が足りれば既定にする。Q2\_Kは精度低下があるため不採用 |
+| 翻訳の見せ方 | タイトルは自動、本文はオンデマンドの対訳表示 | 0.8Bの速度が未計測のため、重い処理は明示操作に寄せる |
+| 対象端末 | Galaxy Z Fold8(Snapdragon 8 Elite Gen 5、RAM 12GBまたは16GB、Android 17) | 0.8Bには十分な余裕があり、2Bも端末内で動かせる見込み |
+| FreshRSSのURL | Tailscale ServeによるHTTPS。FreshRSSは127.0.0.1だけで待ち受ける | FreshRSSの入口をtailnetだけに限定できる。証明書の取得はTailscaleが行い、埋め込みと直結で同じURLを使える |
+| ノード認証 | ブラウザでの対話ログイン。ログイン後に管理画面でキーの有効期限を無効にする | 秘密のキーを扱わずに済み、ACLの編集も要らない |
+
+&#91;embedded content: 構成図 · アプリ内の5要素と外部の3つ\]
+
+tailnetを通るのは同期クライアントとフィードアイコンの通信だけです。記事本文の取得と翻訳は、Tailscaleが止まっていても動きます。
+
+&#91;embedded content: フェーズの流れ · 8フェーズと1つの代替経路\]
+
+接続側(0b → 1)と翻訳側(0c → 2 → 3)は互いに依存しません。0bが完了条件を満たせない場合は、公式Tailscaleアプリ経由の直結で代替します。iOS対応(Phase 5)は、Android版が日常利用できるようになってから着手します。
+
+## リポジトリ構成とブランチ運用
+
+リポジトリはアプリ本体とGoブリッジの2つに分け、アプリ本体はタグ `1.21.0-fdroid` から `main` を切ります。
+
+| リポジトリ | 中身 | 成果物 |
+| --- | --- | --- |
+| アプリ本体(feed-flowのフォーク) | 既存コード、新規モジュール `tailnet/` と `translation/`、llama.cppのsubmodule | APK(arm64-v8a)。Phase 5でiOSアプリを足す |
+| `tsbridge` | Go製のtsnetラッパーとloopbackプロキシ、gomobileのビルドスクリプト | Android用のAAR。iOS対応時にxcframeworkを足す(アプリ側はバージョン固定で取り込む) |
+
+GoツールチェーンとgomobileをGradleビルドから切り離すため、`tsbridge` は別リポジトリにします。
+
+### 上流の扱い
+
+- `upstream` リモート(prof18/feed-flow)はfetch専用で残す。mergeとrebaseはしない。
+- 月に1回、上流のリリースノートを確認する。
+- cherry-pickするもの: `feedSync/greader` と `feedSync/networkcore` の同期不具合修正、セキュリティ修正、自分が踏んだクラッシュの修正。
+- cherry-pickしないもの: 新機能、iOSとデスクトップの変更、依存ライブラリの更新。ただし、脆弱性の修正に必要な依存更新は例外として取り込む。
+- 取り込みは `git cherry-pick -x` で元コミットを記録する。
+
+### 独自コードの置き方
+
+- ロジックは新規モジュールに置き、既存ファイルへの変更は呼び出しの数行に留める。
+- 新規モジュールはKMPモジュールとして作る。OSに依存しないロジックは共通コード(`commonMain`)に置き、OS依存の部分だけをAndroid側に置く。iOS対応時にロジックを書き直さずに済む。
+- 変更した既存ファイルは `FORK_CHANGES.md` に列挙する。cherry-pick時の衝突箇所の目安になる。
+- 上流の `AGENTS.md` と `CLAUDE.md` に、フォーク方針と独自モジュールの規約を追記する。
+
+## Phase 0a フォーク整備
+
+自分のIDを付けたfdroidデバッグビルドを実機に入れ、公式Tailscaleアプリ経由でFreshRSSと同期できる状態を基準線にします。
+
+- [ ] GitHubでフォークし、タグ `1.21.0-fdroid` から `main` を作る。`upstream` リモートを追加する。
+- [ ] 上流のエージェント設定(`AGENTS.md`、`.mcp.json`、`.ai/skills`、`.github/workflows`、`renovate.json`)を整理する。対象と対処は「エージェントへの引き継ぎ」タブにある。
+- [ ] 上流READMEの手順どおり、`config/dummy-google-services.json` を `androidApp/src/debug/` と `androidApp/src/release/` に `google-services.json` としてコピーする。
+- [ ] `./gradlew :androidApp:assembleFdroidDebug` が通ることを確認する。
+- [ ] `applicationId`(現在は `com.prof18.feedflow`)、アプリ名、アイコンを差し替える。
+- [ ] `settings.gradle.kts` から `:desktopApp` と `:benchmarks` を外す。`androidApp/build.gradle.kts` の `baselineProfile` 依存も合わせて外す。
+- [ ] MacにDockerでFreshRSSを構築し、APIアクセスを有効にしてAPIパスワードを設定する(手順はこのセクションの末尾)。
+- [ ] 公式Tailscaleアプリを接続した状態で、アプリにFreshRSSアカウントを追加して同期する。
+
+**残すもの**: `feedSync:dropbox`、`googledrive`、`icloud`、`feedbin` は `shared` モジュールが直接依存しているため、ビルド対象から外せません。モジュールは残し、使わないアカウント種別は後で設定画面から隠します。`iosApp/` や `website/` などのディレクトリも削除せず放置します。
+
+**確認済みの事実**: マニフェストは `usesCleartextTraffic="true"` なので、loopbackのプロキシへの平文接続に追加設定は要りません。この計画で挙げた差し込み箇所は、タグ `1.21.0-fdroid` のコミットで確認済みです。
+
+**完了条件**: 実機で購読一覧と未読記事が同期され、アプリでの既読がFreshRSS側に反映される。
+
+### FreshRSSの到達URL
+
+FreshRSSはMac mini内の `127.0.0.1:8080` だけで待ち受け、Tailscale Serveでtailnetに公開します。アプリに入れるURLは次の形です。
+
+```
+https://<マシン名>.<tailnet名>.ts.net/api/greader.php
+```
+
+- Dockerの公開先を `127.0.0.1` に限定し、家庭内LANからの入口を作らない。tailnetからの入口はServeだけになる。
+- 証明書はTailscaleがLet's Encryptから取得する。前提として、管理画面のDNSページでMagicDNSとHTTPS証明書を有効にする([Enabling HTTPS](https://tailscale.com/docs/how-to/set-up-https-certificates))。
+- HTTPS証明書を有効にすると、マシン名とtailnet名が公開の証明書透明性ログに載る。Mac miniのマシン名に個人を特定できる語を入れない。
+- 埋め込み(tsnet)でも直結(公式アプリ)でも同じURLを使う。埋め込みでは、loopbackプロキシの `CONNECT` 経路を通る。
+
+### MacでのFreshRSS構築
+
+FreshRSSは公式イメージをDocker Composeで動かします。動かすのは、開発と兼用で固定設置しているMac miniです。構成は[公式のDocker手順](https://github.com/FreshRSS/FreshRSS/blob/edge/Docker)の例を基に、公開先だけ `127.0.0.1` に絞っています。
+
+```yaml
+services:
+  freshrss:
+    image: freshrss/freshrss
+    container_name: freshrss
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      TZ: Asia/Tokyo
+      CRON_MIN: "13,43"
+    volumes:
+      - freshrss_data:/var/www/FreshRSS/data
+      - freshrss_extensions:/var/www/FreshRSS/extensions
+
+volumes:
+  freshrss_data:
+  freshrss_extensions:
+```
+
+1. Mac miniにOrbStackを入れ、上の `compose.yaml` を置いたフォルダで `docker compose up -d` を実行する。
+2. Mac miniにTailscaleアプリを入れてログインし、管理画面のMachinesでマシン名とtailnet名を確認する。
+3. 管理画面のDNSページで、MagicDNSとHTTPS証明書を有効にする。
+4. ターミナルで `tailscale serve --bg 8080` を実行する。`--bg` を付けると、再起動後も設定が残る([tailscale serve](https://tailscale.com/docs/reference/tailscale-cli/serve))。
+5. 公開用のURL `https://<マシン名>.<tailnet名>.ts.net/` をブラウザで開き、FreshRSSの初期設定を済ませる。データベースは既定のSQLiteで足りる。`localhost` や、OrbStackがコンテナに自動で割り当てる orb.local のURLからは初期設定しない。
+6. `base_url` を公開用のURLに合わせる。`docker exec --user www-data freshrss ./cli/reconfigure.php --base-url https://<マシン名>.<tailnet名>.ts.net` を実行し、FreshRSSのシステム設定画面で値を確かめる。`/api/greader.php` は付けない。
+7. FreshRSSの認証設定でAPIアクセスを許可し、プロフィール画面でAPIパスワードを設定する。
+8. tailnetにつないだ別の端末から公開用のURLを開き、FreshRSSが表示されることを確かめる。
+9. 同じLANの別の端末から `http://<Mac miniのLAN内IP>:8080/` を開き、つながらないことを確かめる。
+10. フィードを1つ登録し、APIの購読一覧が返す `iconUrl` に `localhost` や `:8080` が含まれないことを確かめる。
+
+手順5と6が要る理由: FreshRSSは `base_url` をインストール時の環境から決め、APIが返すフィードアイコンのURLをこの値から組み立てます([FreshRSS: 設定ファイルの項目](https://freshrss.github.io/FreshRSS/en/admins/17_configs_not_ui.html))。`localhost` のままだと、スマホからアイコンを取得できず、プロキシの宛先照合にも通りません。
+
+注意点が4つあります。
+
+- `CRON_MIN` を指定しないと、フィードの自動更新が動かない。
+- Mac miniがスリープしている間は、同期もフィードの更新も止まる。システム設定で、ディスプレイがオフのときに自動でスリープしないようにする。
+- 再起動後もFreshRSSが立ち上がるよう、OrbStackをログイン時に起動する設定(Start at login)にする。再起動後は `tailscale serve status` でServeの設定が残っていることも確認する。
+- ログイン時の起動は、Mac miniにログインするまで動かない。停電などで再起動した後、ログイン画面で止まっている間はFreshRSSを使えない。再起動してから使えるようになるまでの条件を0aで実際に確かめ、必要なら自動ログインを設定する。
+
+## Phase 0b tsnetスパイク
+
+画面1枚の検証アプリで、端末がtailnetに参加し、FreshRSSのAPIからHTTP 200を得るところまでを確認します。計画全体で最大のリスクなので、0aの直後に着手します。
+
+### tsbridgeの公開API
+
+gomobileで公開できる型(文字列、数値、真偽値、インターフェース)だけで構成します。
+
+```go
+package tsbridge
+
+type Callbacks interface {
+    OnAuthURL(url string)   // ログインが必要なとき
+    OnState(state string)   // starting / running / needs-login / error
+    Log(line string)
+}
+
+// authKey はスパイクの自動試験でだけ渡す。対話ログインでは空文字列にする。
+func Start(stateDir, hostname, authKey string, cb Callbacks) error
+func Stop()
+func ProxyPort() int                 // 127.0.0.1 上の待受ポート
+func ProxyToken() string             // 起動ごとに生成
+func SetAllowedTarget(hostPort string)
+func SetNetworkState(interfacesJSON, dnsServers string)
+```
+
+### 実装手順
+
+1. `tsnet.Server` に状態ディレクトリとホスト名を渡して起動する。ログインURLはLocalClientの状態から取り、`OnAuthURL` で返す。
+2. `127.0.0.1:0` でHTTPプロキシを待ち受ける。平文HTTPの転送と `CONNECT` の両方を実装し、宛先への接続は `srv.Dial` を使う。
+3. プロキシは `SetAllowedTarget` で登録した1件だけを通し、`Proxy-Authorization` のトークンが無い要求と合わない要求には、407と Proxy-Authenticate ヘッダを返す。許可していない宛先には403を返す。OkHttpの認証処理は407とこのヘッダが揃わないと動かない。
+4. 下の表のAndroid固有の対処を入れる。
+5. `gomobile bind -target=android/arm64` でAARを作る。サイズ削減には `ts_omit_*` ビルドタグを使う(一覧はTailSocksの `appctr/build.sh` にある)。
+6. 検証アプリで、起動 → ログインURLをCustom Tabで開く → OkHttpにプロキシを設定 → `api/greader.php` をGET、の順に確かめる。
+
+`Start` と `Stop` はGo側で1本の直列キューに載せます。tsnetは `Close` を `Start` の前や同時に呼ぶことを禁じているためです。
+
+`tsnet.Server` は使い切りです。初期化と終了はそれぞれ1回しか実行されない作り(`sync.Once`)になっており、閉じたインスタンスに `Start` を呼んでも再起動しません。Goブリッジは次の規則で実装します。
+
+- 停止が完了したらインスタンスを破棄し、次の起動では新しい `tsnet.Server` を生成する。
+- 状態ディレクトリは同じ場所を引き継ぐ。ログイン状態が維持される。
+- 初期化に失敗したインスタンスも、後始末をして破棄する。失敗したインスタンスはエラーを保持したままになるため、再利用しない。
+
+チェックポイント5(停止と起動を5回繰り返す)が、この規則の確認になります。
+
+### Android固有の対処
+
+| 問題 | 対処 | 参照実装 |
+| --- | --- | --- |
+| アプリからは `net.Interfaces()` が必ず失敗する | `netmon.RegisterInterfaceGetter` を登録し、Kotlinから渡したJSON(名前、アドレス、up、MTU)を返す | [tailscale-android](https://github.com/tailscale/tailscale-android) の `libtailscale/tailscale.go`、[TailSocks](https://github.com/bropines/tailsocks) の `appctr/netmon_android.go` |
+| `/etc/resolv.conf` が無く、制御サーバーの名前解決に失敗する | `net.DefaultResolver` を、Kotlinから渡したDNSサーバーへ向ける。取れないときは公開DNSを使う | [tailscale/tailscale#21129](https://github.com/tailscale/tailscale/issues/21129) |
+| Wi-Fiとモバイルの切替を検知できない | `ConnectivityManager.NetworkCallback` から `SetNetworkState` を呼び、netmonへ変更イベントを注入する | tailscale-android の `libtailscale/net.go` |
+| 診断ログがTailscaleへ送信される | 起動前に環境変数 `TS_NO_LOGS_NO_SUPPORT=true` を設定する | TailSocks の `appctr/daemon.go` |
+
+スパイクで確かめる点が3つあります。
+
+- **ネットワーク変更の通知**: `Server.Sys()` からnetmonを取り、`InjectEvent()` を呼ぶ経路がある。ただし `Sys()` は安定APIではないと明記されている。固定したバージョンで使え、更新時に追随できるかを確かめる。
+- **無改造で足りるか**: TailSocksは v1.104.5 のソースを手元に置いて差し替えている。無改造の `tailscale.com` モジュールで足りるかを確かめる。
+- **上流のAndroid向け修正が効くか**: Issue #21129は[PR #21152](https://github.com/tailscale/tailscale/pull/21152)で修正されたが、対象はAPKではないcgoなしのバイナリである。DNSについては `feature/androiddns` も入っている。gomobile構成でどこまで効くかを、採用するバージョンとビルドタグの組み合わせで確かめる。効かなければ上の表の対処を自前で入れる。
+
+Android 17のローカルネットワーク保護は、targetSdkが36のままなら適用されません([Local network permission](https://developer.android.com/privacy-and-security/local-network-permission))。タグ時点のtargetSdkは36なので、上げずに進めます。
+
+### tailnet側の準備
+
+- 認証は対話ログインにする。アプリが出すログインURLをブラウザで開き、普段のTailscaleアカウントでログインする。
+- ログイン後、管理画面のMachinesで該当ノードのメニューから「Disable Key Expiry」を選ぶ。既定ではノードキーが180日で失効し、再ログインが要るため([Key expiry](https://tailscale.com/docs/features/access-control/key-expiry))。
+- アクセス制御のポリシーは既定のままでよい。ポリシーを変更していなければ、自分の端末同士は通信できる。
+- auth keyは使わない。キー自体が最長90日で失効し、秘密の文字列をアプリに貼る手間が増える([Auth keys](https://tailscale.com/kb/1085/auth-keys/))。
+- タグとACLで到達先をFreshRSSだけに絞る構成は、必要を感じたら後から足す。プロキシ側で宛先を1件に限定しているので、最初は省略できる。
+
+### エージェント開発での進め方
+
+実装はコーディングエージェントに任せる前提なので、進み具合は日数ではなくチェックポイントの到達で測ります。エージェントが自分で合否を判定できるよう、各チェックポイントの結果をlogcatに決まった文字列で出します。
+
+| # | チェックポイント | 確認方法 | 人の操作 |
+| --- | --- | --- | --- |
+| 1 | AARがビルドでき、検証アプリが起動する | ビルドの成否と、logcatの起動マーカー。実機では `adb shell getconf PAGE_SIZE` の値も記録する | 不要 |
+| 2 | tsnetが起動してtailnetに参加する | logcatに状態 `running` とtailnet上のIPが出る | 不要(ephemeralのauth keyを使う) |
+| 3 | プロキシ経由でFreshRSSにログインし、購読一覧のJSONを取得する | logcatに認証成功と購読件数が出る | 不要 |
+| 4 | 許可していない宛先と、誤ったトークンの要求が拒否される | logcatに、許可外の宛先は403、トークンの誤りは407と出る | 不要 |
+| 5 | 停止と起動を5回繰り返しても、3が通る | 検証アプリ内で繰り返し、毎回の結果をlogcatに出す | 不要 |
+| 6 | 対話ログインで、永続ノードとしてtailnetに参加できる | ブラウザでログインした後、2の状態になる | ログイン操作 |
+| 7 | 永続ノードで、アプリを再起動しても再ログインなしで3が通る | `adb` で再起動して3を再実行する | 不要(6の後に実施) |
+| 8 | 自宅Wi-Fiとモバイル回線の両方で3が通り、切替後も復帰する | 切替から30秒以内にlogcatへ成功が出る | 実機での切替 |
+
+- 1〜5は人の操作が要らないので、エージェントがエミュレータで繰り返し試せる。エミュレータのABIに合わせて、AARのビルド対象を足す。
+- 1〜5の認証には、使い捨て(ephemeral)で再利用可能なauth keyを使う。ブラウザ操作なしで何度でも参加でき、オフラインになったノードは自動で消える。
+- ephemeralノードはオフライン後に消えるため、状態の保存と復帰は検証できない。本番と同じ対話ログインの永続ノードで、6と7として別に確認する。
+- 1で記録したページサイズが16KBの場合は、AAR内のネイティブライブラリが16KB境界に整列されていることも確かめる。
+- auth keyはリポジトリに入れず、環境変数か `local.properties` で渡す。スパイクが終わったら管理画面で失効させる。
+- エージェントには、試行ごとに「仮説、変更内容、到達したチェックポイント」を `SPIKE_LOG.md` に追記させる。撤退の判定をこの記録で行う。
+
+* ephemeralの試験(1〜5)と対話ログインの試験(6〜8)では、状態ディレクトリを分ける。6以降ではauth keyの設定も外す。tsnetは保存済みの登録状態を再利用するので、同じ状態を使うと対話ログインの検証にならない。
+
+- FreshRSSは開発機と同じMac miniで動くので、チェックポイント3は必ずtailnet名のURLで確認する。`localhost` やエミュレータからホストを指すアドレス(`10.0.2.2`)で確認すると、tsnetを通らずに合格してしまう。
+
+### 完了条件
+
+チェックポイント1〜8がすべて通り、起動から疎通までの秒数(初回と2回目以降)とAARのサイズを記録できていること。確認は、公式Tailscaleアプリを停止した状態で行います。
+
+### 撤退の基準
+
+次のどちらかに当たった時点で、埋め込みを見送ります。
+
+- `tailscale.com` 本体のソースにパッチを当てないと先へ進めないと分かった。更新のたびにパッチの当て直しが要り、保守を軽くする方針に反する。
+- 同じチェックポイントで、原因の仮説を変えた試行が3回続けて到達点を進められなかった。
+
+見送った場合は、接続を公式アプリ経由の直結だけにして、Phase 2以降へ進みます。
+
+## Phase 0c 翻訳スパイク
+
+実機で0.8Bを動かし、タイトル1件と段落1つの翻訳にかかる時間とメモリを測って、自動翻訳の範囲を決めます。0bとは独立なので並行できます。
+
+### 確認済みの前提
+
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) の最新(タグ `b12360`、11月13日時点)は `plamo3` アーキテクチャを持つ。
+- Llamatikは生成APIがチャットモデル向けの停止文字列を内蔵しており、任意のstop指定ができない(11月13日時点の最新コードで確認)。採用せず、llama.cppを直接組み込む。
+- JNIの構成は llama.cpp の `examples/llama.android/lib` を手本にする。ただしチャットテンプレート前提なので、生成部分は自作する。
+
+### 手順
+
+1. PCで先に確認する。`plamo-3-translate-0.8b-GGUF` のQ4\_K\_Mをllama.cppのCLIで読み、英語から日本語への翻訳が出ることを確かめる。プロンプトと停止条件をここで確定する。
+2. JNIを書く。公開する関数は `load(path, nCtx, nThreads)`、`countTokens(prompt)`、`translate(prompt, maxTokens, callback)`、`cancel()`、`unload()` の5つ。
+3. `translate` は途中経過に加えて終了理由を返す。種類は、正常終了、`maxTokens` での打ち切り、キャンセル、エラーの4つ。
+4. トークナイズでは `add_special=true`(BOSの付与)と `parse_special=true`(特殊トークンの解釈)の両方を指定する。2つは別の引数で、片方だけでは足りない。
+5. BOSが1回だけ入り、トークン列がモデルカードの例と一致することを、1のPCでの結果と照合して確かめる。
+6. サンプリングはgreedyにする。停止条件は `<|plamo:tag|>` と `<|plamo:bos|>` のトークンID、およびEOSとする。
+7. `translate` の呼び出しごとに、前回の推論の状態(KVキャッシュ)を消す。同じプロンプトを2回続けて訳し、出力のトークン列が完全に一致することを確かめる。
+8. `maxTokens` は固定値にせず、原文のトークン数に比例させる。初期値は「64と、原文トークン数の3倍の、大きい方」とし、計測で調整する。同じ語句を繰り返して止まらなくなった場合でも、短時間で打ち切れる。
+9. 呼び出し前に `countTokens` で数え、「プロンプトのトークン数 + 出力予算 ≤ nCtx」を満たさない入力は拒否する。
+10. インラインコードの保護方式を2つ試す。記号のプレースホルダに置き換える方式と、コードの文字列を `glossary` に「原語と同じ訳語」として渡す方式で、訳文にコードがそのまま残る割合を比べる。
+11. 中国語のタイトルを、原文言語を指定しない場合と指定した場合の両方で訳し、どちらが正しく訳せるかを確かめる。
+12. CMakeでllama.cppをsubmodule(タグ固定)として取り込み、`arm64-v8a` のCPUバックエンドだけをビルドする。
+13. 検証アプリを作る。モデルは `adb push` で置き、下の表の入力を計測する。
+
+### プロンプトの構造
+
+要素の並びは次のとおりです。区切りや改行の厳密な形は[モデルカード](https://huggingface.co/pfnet/plamo-3-translate-0.8b/blob/main/README_ja.md)のコード例をそのまま移植します。先頭のBOSはプロンプトには書かず、トークナイズ時の指定で付けます。
+
+```
+<|plamo:tag|>dataset<|plamo:msg|>translation
+<|plamo:tag|>context<|plamo:msg|>{参考テキスト(任意)}
+<|plamo:tag|>glossary<|plamo:index|>{原語}<|plamo:item|>{訳語}(任意、複数可)
+<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>{原文}
+<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja<|plamo:key|>form<|plamo:val|>plain<|plamo:msg|>
+```
+
+例では原文言語を `en` と書いていますが、原文言語の指定は省略でき、省略するとモデルが推定します。固定値にはせず、フィードの言語が分かっている場合だけ指定します。
+
+### 計測項目
+
+| 入力 | 記録する値 |
+| --- | --- |
+| モデルのロード | アプリ起動直後のロード時間、ロード後のメモリ使用量 |
+| 記事タイトル1件(ロード済み) | 完了までの秒数 |
+| 記事タイトル20件を連続 | 全件が完了するまでの時間 |
+| 段落(英語100語前後) | 最初のトークンまでの時間、tokens/秒 |
+| 段落20個を連続 | 合計時間、発熱による速度低下の有無、推論中のメモリのピーク |
+| 推論中のキャンセル | 指示してから実際に止まるまでの時間 |
+| モデルのアンロード | アンロード後のメモリ使用量 |
+| 同じプロンプトを2回連続 | 出力のトークン列が一致するか |
+| インラインコードを含む段落20個 | 2つの保護方式それぞれで、コードがそのまま残った段落の割合 |
+| 中国語のタイトル10件 | 原文言語の指定あり・なしそれぞれで、正しく訳せた件数 |
+| 英語と日本語の文章 | 文字数とトークン数の比。文字数による分割の上限を決めるのに使う |
+| 普段読む記事10本 | 否定、数値、固有名詞、技術用語の誤りと、訳抜けの件数(人が読んで確認) |
+| 実機のページサイズ | `adb shell getconf PAGE_SIZE` の値。16KBならネイティブライブラリの整列も確かめる |
+
+計測値はlogcatに決まった形式で出し、エージェントが読み取って表にまとめられるようにします。
+
+### 判断の目安
+
+- タイトル20件が30秒以内に完了するなら、タイムライン表示時の自動翻訳を採用する。超えるなら表示時には訳さず、同期後のバッチ翻訳だけにする。
+- 段落が15 tokens/秒以上で、キャンセルが1秒以内に効くなら、本文のストリーミング対訳を採用する。下回るなら本文はリモートエンジン(Phase 4)を先に作る。
+- 記事10本の確認で否定や数値の誤りが目立つモデルは、速度が足りていても本文翻訳に使わない。
+- 2BのQ4\_K\_M(1.81GB)でも同じ計測をする。2Bを既定にするのは、速度の目安を満たし、訳の誤りが0.8Bより明らかに少なく、推論中のメモリのピークでアプリが落ちない場合に限る。
+- インラインコードの保護は、コードが残った割合の高い方式をPhase 3で採用する。どちらも低い場合の扱いは、計測結果を見て決める。
+
+**完了条件**: 表の値が実機で取れ、上の5点を決められる。
+
+## Phase 1 Tailscale統合
+
+同期クライアントと画像ローダーに「FreshRSSホスト宛てだけプロキシを通す」設定を差し込み、埋め込みtsnetだけでログインから同期まで通します。0bの完了が前提です。
+
+### 新規モジュール `tailnet/`
+
+| クラス | 役割 |
+| --- | --- |
+| `TailnetManager` | tsbridgeの起動と停止。状態(停止、要ログイン、起動中、接続済み、エラー)を `StateFlow` で公開する。`ensureUp(timeout)` を提供する |
+| `TailnetProxySelector` | `java.net.ProxySelector` の実装。リクエストのホストがFreshRSSホストと一致するときだけ `127.0.0.1:<port>` を返し、それ以外は直接接続にする |
+| `NetworkStateReporter` | `ConnectivityManager.NetworkCallback` を受け、インターフェースとDNSの情報をtsbridgeへ渡す |
+| `TailnetSettings` | 接続モード(埋め込み / システム)とノード名を保存する |
+
+tsnetは常駐させません。アプリがフォアグラウンドに来たときと同期の直前に起動し、バックグラウンド移行の数分後に止めます。
+
+iOS対応に備え、`TailnetManager` の状態と操作は共通コードのインターフェースとして定義し、実装をAndroid側に置きます。`TailnetProxySelector` はOkHttp専用なので、iOSでは別の方法を使います(Phase 5)。
+
+### 接続のライフサイクル
+
+`TailnetManager` は次の規則を守ります。同期の途中で停止タイマーが働く、といった競合を防ぐためです。
+
+- 起動は多重に走らせない。起動中に来た要求は、同じ起動処理の完了を待つ。
+- 停止のたびにtsnetのインスタンスは破棄され、起動のたびに新しく作られる(0bの規則)。ログイン状態は状態ディレクトリから引き継がれる。
+- 同期や画像取得は「利用中」の印を取ってから通信し、終わったら返す。利用中が1件でもあれば停止しない。
+- 利用中の印は、レスポンス本文の読み取りが終わるか、レスポンスを閉じるまで保持する。OkHttpはヘッダーを受け取った後も本文を逐次読むため、ヘッダー受信の時点では通信が終わっていない。
+- 印を返す実装は、Interceptorの `finally` には書かない。レスポンス本文のソースをOkioの `ForwardingSource` で包み、終端まで読んだときか `close()` が呼ばれたときに返す。通信が例外で失敗した場合はその場で返す。二重に返さないよう、返却は1回だけ効く作りにする。
+- 印には保持時間の上限を設ける。上限に達したら、印だけを返すことはしない。対象の通信をキャンセルし、レスポンスを閉じ、その後で印を1回だけ返す。印だけ先に返すと、遅い通信が続いているのにtsnetが止まる。
+- 停止待ちのタイマーは、利用中が0件になってから始める。
+- 起動と停止は1本の直列キューで実行する。
+- 再起動するとプロキシのポートとトークンが変わる。利用側は値を保持せず、要求のたびに現在値を読む。
+- 停止時と再起動時に、OkHttpの接続プールを空にする(`connectionPool.evictAll()`)。これで閉じられるのは待機中の接続だけで、実行中の通信のキャンセルの代わりにはならない。
+- 埋め込みモードで接続に失敗しても、直結には自動で切り替えない。エラーとして表示し、切替は設定画面で明示的に行う。
+- プロキシを通す宛先の照合は、正規化したホスト名、ポート、スキームの3つで行う。
+
+### プロキシ認証のやり取り
+
+FreshRSSへの通信はHTTPSなので、OkHttpはプロキシに `CONNECT` でトンネルを張ります。トークンはこの `CONNECT` 要求に付ける必要があり、通常のInterceptorで付けたヘッダはトンネルの内側に入るためプロキシに届きません。
+
+- トークンは `proxyAuthenticator` で付ける。OkHttpは `CONNECT` を送る前に、事前認証用のチャレンジ(`OkHttp-Preemptive`)でこの処理を呼ぶので、そこで現在のトークンを返す。407の往復なしで認証できる([OkHttp: Authenticator](https://square.github.io/okhttp/5.x/okhttp/okhttp3/-authenticator/index.html))。
+- Go側のプロキシは、トークンが無いか合わないとき、407と `Proxy-Authenticate` ヘッダを返す。tsnetの再起動でトークンが変わった直後でも、OkHttpが新しいトークンでやり直せる。
+- `proxyAuthenticator` は、同じトークンを付けた要求が再び407になったら `null` を返して打ち切る。認証のやり直しが繰り返されるのを防ぐ。
+
+### 既存コードへの変更
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `feedSync/greader/.../di/GReaderModule.kt` | `getGReaderModule` に `HttpClientEngine?` の引数を足し、`GReaderClient` が既に持つ `httpClientEngine` 引数へ渡す |
+| `shared/.../di/Koin.kt` | Android側で組み立てたOkHttpエンジンを `getGReaderModule` に渡す。エンジンには `TailnetProxySelector`、起動待ちのInterceptor、トークンを返す `proxyAuthenticator` を設定する |
+| `androidApp/.../ui/utils/ImageLoader.kt` | 同期用と同じ共通設定関数(プロキシ選択、起動待ち、トークン認証)を、画像ローダーのOkHttpに適用する |
+| FreshRSSアカウントの設定画面 | 接続モードの切替、ログインボタン、接続状態の表示を足す |
+| バックグラウンド同期のWorker | 同期の前に `ensureUp` を呼び、起動待ちの分だけタイムアウトを延ばす |
+
+画像ローダーの変更が必要な理由: フィードのアイコンは同期APIが返す `iconUrl` をそのまま読み込んでおり、このURLがFreshRSSホストを指す場合、プロキシなしでは表示できません。記事本文と記事内画像は公開サイトから直接取得するので、変更しません。
+
+同期用と画像用のOkHttpには、プロキシ選択、起動待ち、トークン認証をまとめた共通の設定関数を1つ作り、両方に適用します。画像用だけ認証や起動待ちが漏れるのを防ぐためです。
+
+### 完了条件
+
+- [ ] 公式Tailscaleアプリなしで、初回ログインから同期まで完了する。
+- [ ] フィードのアイコンが表示される。
+- [ ] アプリをタスク一覧から消した状態で、バックグラウンド同期が成功する。
+- [ ] 同期の途中でアプリをバックグラウンドに移しても、同期が終わるまでtsnetが止まらない。
+- [ ] 本文の受信が遅い通信が印の保持上限に達すると、通信がキャンセルされてからtsnetが止まる。通信が続いたままtsnetだけが止まることはない。
+- [ ] tsnetが正常に停止している状態から同期すると、自動で起動して同期に成功する。
+- [ ] 起動の失敗、ログイン未完了、接続タイムアウトのどの場合も、同期がエラーになり、直結では通信しない。
+- [ ] 接続モードを「システム」にすると、0aと同じ直結で動く。
+- [ ] 記事本文の取得がプロキシを通っていないことをログで確認する。
+
+## Phase 2 タイトル翻訳
+
+同期後に外国語記事のタイトルと概要を訳し、タイムラインに訳題を出します。0cの完了が前提で、Phase 1とは独立に進められます。
+
+### 新規モジュール `translation/`
+
+| クラス | 役割 |
+| --- | --- |
+| `TranslationEngine` | 翻訳エンジンのインターフェース。途中経過(`Delta`)と終了理由(`Completed`、`Truncated`、`Cancelled`、`Failed`)をイベントの `Flow` で返す。最初の実装は `LlamaCppEngine` |
+| `PlamoPromptBuilder` | 対象言語、原文言語、文脈、用語集、常体/敬体からプロンプトを組み立てる。原文言語は分かっている場合だけ指定する。版番号を持ち、出力文字列を固定値と比べる単体テストを付ける |
+| `TokenBudget` | 文脈の切り詰めと原文の分割を、文字数にもとづく決定的な規則で行う。トークナイザを使わないので、モデルをロードしていなくても同じ結果になる。分割は文の区切り、空白、文字数の上限の順に試し、区切りの無い長文でも必ず分割できるようにする。文字数の上限は0cで測った比から決め、推論の直前に `countTokens` で超過を検査する |
+| `TranslationQueue` | 推論を1本ずつ実行する。表示中の記事をバッチより優先する。キャンセルは要求元ごとに受け付け、画面のキャンセルがバッチの要求を消さないようにする。一定時間使われなければモデルをアンロードするが、実行中の推論が終わるまではアンロードしない。`maxTokens` は原文のトークン数に比例させて渡す |
+| `ModelStore` | Hugging Faceからのダウンロード(中断からの再開、SHA256検証)、保存、削除を行う。ファイルのハッシュをモデルの版として記録する |
+| `LanguageGate` | 翻訳対象かを決める。フィード別設定、フィードの推定言語、記事の言語タグ、文字種の順に見る。直近のタイトルの大半がかなを含むフィードは日本語フィードと推定し、その中のかなを含まないタイトルも翻訳しない。それ以外のフィードでは、かなを含む文だけを日本語とみなし、漢字だけの文は日本語扱いしない。文字がほとんど無く判定できないものは翻訳しない |
+| `TranslationCache` | 訳文と失敗の記録の保存と検索を行い、変更を `Flow` で通知する |
+
+`translation/` はKMPモジュールにします。`PlamoPromptBuilder`、`TranslationQueue`、`LanguageGate`、`TranslationCache` は共通コードに置き、`LlamaCppEngine` と `ModelStore` のファイル操作だけをAndroid側の実装にします。
+
+### キャッシュの保存先
+
+キャッシュは `translation/` モジュール専用のSQLDelightデータベース(別ファイル)に置きます。既存データベースにテーブルを足すとマイグレーション番号が上流と衝突するため、既存スキーマには触れません。
+
+```sql
+CREATE TABLE translation_cache (
+  url_hash     TEXT NOT NULL,
+  field        TEXT NOT NULL,   -- 'title' / 'subtitle' / 'block'
+  source_hash  TEXT NOT NULL,   -- 原文のハッシュ
+  context_hash TEXT NOT NULL,   -- モデルへ渡した参考文脈のハッシュ
+  config_hash  TEXT NOT NULL,   -- 翻訳条件のハッシュ
+  model_rev    TEXT NOT NULL,   -- モデルファイルのハッシュ
+  text         TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  PRIMARY KEY (url_hash, field, source_hash, context_hash, config_hash, model_rev)
+);
+```
+
+キーに原文と翻訳条件を含めるのは、条件が変わったときに古い訳文を返さないためです。
+
+- `source_hash`: タイトルや概要が配信元で修正されたら、訳し直す。
+- `context_hash`: モデルへ渡す参考文脈から計算する。同じ短文が記事内の別の場所にあっても、前後が違えば別の訳として扱う。文脈を渡さない場合は空文字列のハッシュにする。
+- `config_hash`: 原文言語、訳文言語、常体/敬体、用語集、プロンプトの版番号から計算する。
+- `model_rev`: 同じモデル名で重みが更新されても区別できるよう、ファイルのハッシュを使う。
+
+キーの計算にはトークナイザを使いません。文脈の切り詰めと原文の分割は `TokenBudget` の文字数規則で決まるので、モデルをロードしていない状態でもキャッシュを引けます。キャッシュを引くためだけにモデルをロードすることはしません。
+
+検索時と保存時でキーが食い違うと、保存した訳に当たらなくなります。これを防ぐため、次の4つを実装の規則にします。
+
+- 記事とフィードからキーを作る処理は1つの関数にまとめ、検索する側と保存する側の両方がそれを呼ぶ。原文言語の決め方を2か所に書かない。
+- フィードの推定言語は、決まった時点で保存する。毎回推定し直すと、結果が変わったときにキーも変わる。
+- `source_hash` は、原文のテキストと、保護対象(インラインコード)の位置・文字列・出現順を合わせて計算する。テキストだけで計算すると、`<code>open</code>` と地の文の `open` を区別できず、マークアップだけが直された記事で古い訳が使われる。
+- `config_hash` に含める用語集は、設定画面のユーザー辞書だけにする。インラインコードの保護のためにブロックごとに足す語は含めない。その語は `source_hash` が区別する。
+- `config_hash` に入れる版番号は、プロンプトだけでなく翻訳前の処理全体の版とする。保護方式、分割の規則、文脈の切り方を変えたら番号を上げ、古いキャッシュを無効にする。
+
+フィード単位の設定(翻訳のオン/オフ、推定言語)も、上流の `feed` テーブルには足しません。`translation/` モジュールのデータベースに、別テーブル(`feed_translation_meta`)として持ちます。
+
+保存するのは、正常終了(`Completed`)した訳文だけです。打ち切りやキャンセルで終わった訳文は保存しません。
+
+別データベースなので、外部キーによる記事削除との自動連動はできません。削除は、容量の上限と `created_at` の期限で行います。
+
+### 失敗した翻訳の扱い
+
+初版では、失敗したブロックは再分割せず、原文を残して失敗として扱います。失敗とするのは次の3つです。
+
+- 推論直前の `countTokens` で上限超過と分かった。
+- 生成が `maxTokens` で打ち切られた(`Truncated`)。
+- インラインコードの検証に通らなかった。
+
+失敗は、訳文と同じキーで別テーブルに記録します。
+
+```sql
+CREATE TABLE translation_failure (
+  url_hash     TEXT NOT NULL,
+  field        TEXT NOT NULL,
+  source_hash  TEXT NOT NULL,
+  context_hash TEXT NOT NULL,
+  config_hash  TEXT NOT NULL,
+  model_rev    TEXT NOT NULL,
+  reason       TEXT NOT NULL,   -- 'over_budget' / 'truncated' / 'code_check'
+  failed_at    INTEGER NOT NULL,
+  PRIMARY KEY (url_hash, field, source_hash, context_hash, config_hash, model_rev)
+);
+```
+
+- キャッシュの検索結果は、「成功済み、失敗済み、未処理」の3つに分ける。訳文が無い理由を、モデルをロードする前に区別する。
+- 表示時の自動翻訳とバッチが投入するのは、未処理のものだけとする。投入するものがある場合にだけモデルをロードする。失敗済みしか残っていなければロードしない。
+- 再試行は、利用者が画面で明示的に行った場合だけとする。このときは失敗の記録による抑止を外して投入する。
+- 翻訳が成功したら、訳文の保存と同じトランザクションで、同じキーの失敗の記録を削除する。成功と失敗の記録が同じキーに両方残らないようにする。
+- モデルや版番号が変わるとキーも変わるので、そのときは新しい条件で自動的に試される。
+- 一時的なエラー(メモリ不足やキャンセル)は記録しない。
+- 失敗のテーブルも、訳文のテーブルと同じく、容量の上限と `failed_at` の期限で古い行を消す。
+
+超過時に自動で再分割する方式は採りません。再分割の結果を保存しないと、次回モデルをロードせずに同じキーを作れなくなるためです。失敗が多い場合は、文字数の上限を下げて版番号を上げます。
+
+### 既存コードへの変更
+
+- タイムライン用のUIモデルに訳題のフィールドを1つ足す。
+- 記事一覧を読み込むリポジトリ層で、表示する記事の `url_hash` をまとめてキャッシュに問い合わせ、訳題を埋める。
+- キャッシュの変更通知を購読し、訳が保存されたら一覧を開き直さなくても訳題に切り替わるようにする。
+- 変更通知はUIに直結しない。変更をためておき、300ミリ秒程度の一定間隔でまとめて反映する。最後の変更も必ず反映する。通知が止むまで待つ方式(`debounce`)は、更新が続く間ずっと反映されないので使わない。
+- タイムラインの行で、訳題があれば訳題を主、原題を副として表示する。
+- 設定画面に翻訳の項目を足す: モデルのダウンロードと削除、対象言語、常体/敬体、フィード別のオン/オフ、PLaMo Community Licenseの表示。
+
+### 翻訳を実行するタイミング
+
+タイトルの翻訳は、2つの経路で役割を分けます。
+
+- **表示時**: 画面に出ている未翻訳のタイトルだけを、優先度を上げてキューに積む。0cの目安を満たした場合にだけ有効にする。
+- **同期後のバッチ**: 残りの未翻訳タイトルを、充電中にWorkManagerのジョブで処理する。構成は既存の `ContentPrefetchWorker` と `WorkManagerBackgroundPrefetchScheduler` に合わせる。
+
+バッチは1件訳すごとに保存し、1回のジョブを20件程度で区切ります。WorkManagerのジョブには実行時間の制限があるので、途中で打ち切られても次のジョブが続きから再開できる形にします。
+
+### 完了条件
+
+- [ ] アプリ内からモデルをダウンロードでき、中断後に再開できる。
+- [ ] 英語フィードのタイトルに訳題が表示され、日本語フィードは翻訳されない。
+- [ ] 日本語フィードの、かなを含まないタイトル(「2026年11月期 決算短信」など)が翻訳されない。
+- [ ] 中国語フィードのタイトルが、日本語と誤判定されずに翻訳される。
+- [ ] 一度訳したタイトルは、モデルをアンロードした状態でも、モデルをロードせずに表示される。
+- [ ] 訳が保存されると、一覧を開き直さずに訳題へ切り替わる。
+- [ ] 常体と敬体を切り替えると、古い文体の訳が表示されず、訳し直される。
+- [ ] バッチ翻訳が動いている間も、タイムラインのスクロールが引っかからない。
+
+## Phase 3 本文の対訳表示
+
+リーダーモードのWebView内で段落を列挙し、原文の直下に訳文を流し込みます。HTMLの分割と挿入はWebView側のJavaScriptで行い、Kotlin側ではHTMLを解析しません。
+
+この方式にする根拠は2つあります。リーダーモードは `getReaderModeStyledHtml` が組み立てたHTMLをWebViewで表示しており、既にJSブリッジ(`kmpJsBridge`)を持っています。また、原文を残す対訳表示なら、リンクなどのインラインタグを訳文側で再現する必要がありません。
+
+### 手順
+
+1. `ReaderModeHtmlAndCss.kt` のテンプレートに、ブロックを集める関数を足す。規則は「除外対象以外のテキストノードを、必ず1つの翻訳ブロックに割り当てる」とする。
+2. 子にブロック要素を持たない要素は、要素全体を1ブロックにする。子にブロック要素を持つ要素は、子をそれぞれ別ブロックにし、親が直接持つ文章は連続する範囲ごとに独立したブロックにする。
+3. `div` と `br` だけで組まれた本文や表のセルも、同じ規則で拾う。`br` が2つ以上続く箇所は段落の区切りとして分ける。
+4. `pre`、ごく短いブロック、日本語のブロック、訳文として挿入した要素は対象から除く。
+5. 段落内のインラインの `code` は、0cで成績の良かった方式(プレースホルダへの置き換えか、`glossary` への登録)で保護する。プレースホルダ方式では、同じコードが2回出ても出現箇所ごとに別のIDを振る。
+6. 訳文の検証では、原文中のコードの各出現箇所が、改変なく同じ回数だけ残っていることを確かめる。欠落、改変、回数の不一致があれば失敗として扱い、原文の表示を維持する。
+7. 長いブロックは、`TokenBudget` の文字数規則に従って分割する。分割の結果はモデルのロード状態によらず同じになる。分割位置は、保護対象のコードやプレースホルダの途中を避ける。保護対象だけで上限を超える場合は失敗として扱う。訳文はブロック単位で扱い、すべての分割片が成功したときだけ、つなげた訳文を表示して保存する。一部でも失敗したら、そのブロック全体を原文のままにし、訳文を部分的には表示も保存もしない。
+8. 抽出したブロックの一覧と原文は保持し、ブロックごとの翻訳状態を「未処理、処理中、完了、失敗」で管理する。抽出済みかどうかと、翻訳が完了したかどうかは別の状態として持つ。
+9. 失敗やキャンセルの後の再試行と、文体やモデルを変えた後の再翻訳は、保持した一覧から行う。DOMは再走査しない。
+10. 記事を表示するたびにセッションIDを、翻訳を実行するたびに実行IDを発行する。KotlinとWebViewの間は、記事ID、セッションID、実行ID、ブロックIDを添えたJSONでやり取りする。
+11. JavaScript側は、現在のセッションIDと実行IDの両方に一致する結果だけを反映する。
+12. 訳文の挿入には `textContent` を使い、HTMLとして解釈させない。
+13. ツールバーに翻訳ボタンを足す。押すとブロックを集め、キャッシュにあるものはモデルをロードせずに即時に表示する。検索結果は「成功済み、失敗済み、未処理」に分ける。失敗済みは原文のまま表示し、自動では投入しない。未処理があるときだけ、それを`TranslationQueue` に積んでモデルをロードする。
+14. コードを含まず、分割もしていないブロックは、訳文のストリームを数十ミリ秒ごとにまとめてWebViewへ反映する。
+15. コードを含むブロックは途中経過を表示しない。生成が完了し、検証に通ってから訳文を表示する。検証は生成が終わるまで確定しないためである。複数に分割したブロックも途中経過を表示せず、すべての分割片が成功してからまとめて表示する。
+16. プロンプトの `context` には、記事タイトルと、直前のブロックの原文の先頭から一定の文字数までを渡す。文字数で切るので、文脈も毎回同じになる。分割したブロックでは、すべての分割片にこの同じ文脈を渡す。
+17. 記事の切替や画面を閉じる操作で、その画面が出した要求だけをキャンセルする。キャンセルが間に合わずに届いた結果は、IDの不一致で捨てる。
+18. キャッシュするのは、正常終了し、コードの検証にも通ったブロックだけにする。
+19. 訳文ブロックのCSS(文字色、左の罫線)を足す。
+
+訳文を表示するタイミングは、ブロックの種類で次のように決まります。
+
+| ブロック | 表示するタイミング |
+| --- | --- |
+| コードなし、分割なし | 生成の途中から表示する |
+| コードあり | 生成が完了し、コードの検証に通った後 |
+| 複数に分割したブロック | すべての分割片が成功した後に、まとめて |
+
+### 翻訳ボタンと再試行
+
+ツールバーのボタンは、状態によって「翻訳」と「再試行」の2つの動作を持ちます。
+
+- **翻訳**(記事を開いて最初の押下): キャッシュを検索し、未処理のブロックがある場合だけモデルをロードして訳す。失敗済みのブロックは投入せず、原文のまま失敗の状態で持つ。
+- **再試行**: 翻訳を一度実行した後、画面内に失敗かキャンセル済みのブロックが残っていると、ボタンの表示が「再試行」に変わる。これを押したときだけ、失敗の記録による抑止を外して投入する。
+
+「翻訳」の押下を再試行として扱わないことで、失敗済みしか残っていない記事でモデルをロードしない規則と、画面から再試行できる規則が両立します。
+
+### 分割したブロックのコード検証
+
+分割位置はコードの途中を避けるので、各コードは必ず1つの分割片に属します。保護と検証は分割片ごとに行います。
+
+- 各分割片のプロンプトには、その分割片の原文に含まれるコードだけを保護対象として渡す。
+- 検証も、その分割片に含まれるコードだけを対象にする。ブロック全体のコード一覧と照合しない。全体と照合すると、他の分割片にあるコードが欠落と判定され、必ず失敗する。
+- すべての分割片が検証に通ったときに、ブロック全体を成功とする。
+
+手順2の例として、次のHTMLは「まず準備する」「詳しい説明」「最後に確認する」の3ブロックになります。
+
+```html
+<li>まず準備する<p>詳しい説明</p>最後に確認する</li>
+```
+
+### 既存コードへの変更
+
+| ファイル | 変更内容 |
+| --- | --- |
+| `shared/.../domain/ReaderModeHtmlAndCss.kt` | ブロック収集と訳文挿入のJavaScript、訳文用のCSSを足す |
+| `androidApp/.../readermode/ReaderModeScreen.android.kt` | JSブリッジのハンドラを足し、翻訳用ViewModelとつなぐ |
+| `androidApp/.../readermode/ReaderModeToolbar.kt` | 翻訳ボタンを足す |
+
+`ReaderModeViewModel` には手を入れず、翻訳の状態は別のViewModelに持たせます。上流で最も頻繁に変わるファイルなので、cherry-pickの衝突を避けられます。
+
+iOS版も同じ `getReaderModeStyledHtml` を呼んでいるため、ここで足すJavaScriptとCSSはiOSでそのまま使えます。
+
+### 完了条件
+
+- [ ] 英語の長文記事で、段落ごとに訳文が順に表示される。
+- [ ] 引用やリストの中の段落が、二重に訳されない。
+- [ ] 上の例のように親の文章と子の段落が混在するHTMLで、すべての文章が1回ずつ訳される。
+- [ ] `div` と `br` だけで組まれた記事と、表を含む記事でも訳文が出る。
+- [ ] 記事を素早く切り替えても、前の記事の訳文が混ざらない。
+- [ ] 翻訳をキャンセルした後や失敗した後に、同じ画面で再試行できる。
+- [ ] 同じ記事を開いたまま再翻訳しても、前回の実行の結果が混ざらない。
+- [ ] コードを含む段落では、検証に通るまで訳文が表示されない。コードが欠けたり変わったりした訳文は一度も表示されず、保存もされない。
+- [ ] 同じコードが2回出てくる段落で、訳文に2回とも残る。
+- [ ] 区切りの無い長文や上限を超える入力で、原文が残り、同じブロックが自動で繰り返し試されない。
+- [ ] 翻訳中もスクロールと記事の切替が引っかからない。
+- [ ] モデルをアンロードした状態で同じ記事を開き直すと、モデルをロードせずに、訳文がキャッシュから即時に出る。
+- [ ] コードブロックと日本語の段落が翻訳されず、段落内のインラインコードは原文のまま残る。
+
+* [ ] コードのない3分割の長文で最後の分割片だけを失敗させると、途中の訳文も表示されず、保存もされない。コードを含む長文を分割した場合は、分割片ごとの検証に通って訳文が出る。
+* [ ] 失敗したブロックを画面から再試行して成功させた後、記事を開き直すと、モデルをロードせずにその訳文が出る。
+* [ ] 失敗済みのブロックしか残っていない記事で「翻訳」を押しても、モデルがロードされない。続けて「再試行」を押すと、モデルがロードされてそのブロックが訳し直される。
+
+## Phase 4 拡張
+
+Phase 3までで日常利用できる状態になるので、ここからは使ってみて不足を感じた順に着手します。
+
+| 項目 | 内容 | 着手のきっかけ |
+| --- | --- | --- |
+| 用語集 | ユーザー辞書(原語と訳語の組)を設定画面で編集し、プロンプトの `glossary` に渡す | 固有名詞や専門用語の訳が揺れる |
+| リモートエンジン | 自宅PCの `llama-server` で2Bや8Bを動かし、tailnet経由で呼ぶ `TranslationEngine` 実装を足す。プロキシの許可宛先を2件に広げる | 0.8Bの品質か速度が足りない |
+| 2Bモデルの選択 | 端末内で2BのQ4\_K\_M(1.81GB)を選べるようにする | 端末のメモリに余裕がある |
+| 本文の先読み翻訳 | 指定フィードやブックマークの記事を、充電中に全文翻訳しておく | 0cの計測で全文翻訳が現実的な時間に収まる |
+| 訳文のみ表示 | 原文を隠して訳文だけを読む切替を足す | 対訳表示が冗長に感じる |
+| 左右の対訳表示 | Galaxy Z Fold8の内側画面(7.6インチ)で、原文と訳文を左右に並べる | 上下の対訳が読みにくい |
+
+リモートエンジンの通信は、FreshRSSと同じ接続モードの設定に従わせます。0bを見送って直結だけになった場合も、公式Tailscaleアプリ経由で使えるようにするためです。リモートエンジン用のHTTPクライアントは同期用と分け、読み取りタイムアウトを60〜120秒にします。長文の推論中に、同期用の短いタイムアウトで切れないようにするためです。
+
+## Phase 5 iOS対応
+
+Android版が日常利用できる状態になってから着手し、共通コードを再利用してiOS固有の部分だけを作ります。
+
+共通コードの再利用とは別に、着手の最初で小さな検証を3つ行います。
+
+- Personal Teamでの署名が通るか。App Groupsを使うウィジェットと共有拡張を含めて確かめる。
+- Darwinエンジンでloopbackプロキシを指定でき、トークン認証が通るか。
+- iPhone実機でモデルをロードでき、推論中のメモリのピークでアプリが落ちないか。
+
+| 項目 | iOSでやること |
+| --- | --- |
+| tsbridge | `gomobile bind -target=ios` でxcframeworkを作る。tsnetはユーザースペースで動くので、VPN用の権限(Network Extension)は要らない見込み |
+| 同期の経路 | iOSのKtorはDarwinエンジンで、OkHttpのプロキシ設定が使えない。セッション設定でloopbackプロキシを指定する方法を、着手時に検証する |
+| llama.cpp | llama.cppの `build-xcframework.sh` でxcframeworkを作り、`TranslationEngine` のiOS実装から呼ぶ |
+| 画面 | 上流のiOS版はSwiftUIなので、Tailscaleと翻訳の設定画面、タイムラインの訳題表示、リーダーの翻訳ボタンをSwiftUIで作る |
+| 平文HTTP | 対応不要。上流の `Info.plist` は任意の通信を許可している |
+| バックグラウンド | iOSはバックグラウンド実行の制約が強い。同期と翻訳はアプリを開いている間を基本にする |
+
+開発用のMacがあるので、ビルド環境の前提は満たしています。上流のiOS版の対応OSはiOS 17.0以上です。署名はApple Developer Programに入らず、無料のApple ID(XcodeのPersonal Team)で行います。
+
+### 無料のApple IDで署名する場合の制約
+
+- 署名は7日で失効する。失効後はアプリが起動しなくなり、Xcodeから入れ直す。
+- iCloudとAssociated Domainsは使えない。上流のiOS版はこの2つをentitlementsで要求しているので、外したうえでiCloud同期の導線を隠す。
+- App Groupsが無料で使えるかは、情報が割れていて未確認。使えない場合は、ウィジェットと共有拡張を外す。
+- 1台に入れられるアプリは3つまで、登録できるApp IDは10個まで。このアプリは本体、共有拡張、ウィジェットで3つのApp IDを使う。
+- tsnetはユーザースペースで動かすので、有料プログラムが要る権限は使わない見込み。
+
+7日ごとの入れ直しが負担になったら、その時点でApple Developer Programへの加入を検討します。加入すると開発用の署名は最長1年有効になります([Expoの解説](https://expo.dev/blog/apple-developer-program-explained-free-vs-paid)、[Apple: Choosing a Membership](https://developer.apple.com/support/compare-memberships))。
+
+**完了条件**: iPhone実機で、同期、タイトル翻訳、本文の対訳表示が動く。同期は埋め込みtsnetを第一とするが、冒頭の検証で成立しなければ、Androidと同じく公式Tailscaleアプリ経由の直結で代替してよい。
+
+## 保守運用
+
+保守の中心は上流FeedFlowではなく、tsnetとllama.cppの更新です。どちらも更新のたびにスパイクの完了条件を再実行して確かめます。
+
+| 対象 | 更新のきっかけ | 手順 |
+| --- | --- | --- |
+| 上流FeedFlow | 月1回のリリースノート確認 | 同期とセキュリティの修正だけ `git cherry-pick -x` で取り込む |
+| tsnet(`tailscale.com`) | 接続不良、Tailscaleのセキュリティ告知、半年に1回の定期確認 | `tsbridge` の `go.mod` を更新し、0bの完了条件を再実行してからAARを差し替える |
+| llama.cpp | 新しいモデルが読めない、速度改善を取り込みたい | submoduleのタグを更新し、0cの計測を再実行する |
+| PLaMoモデル | PFNが新版を公開 | モデルを差し替える。`model_rev` がキャッシュのキーに入っているため、古い訳文とは混ざらない |
+| Kotlin、AGP、Compose | 新しいAndroidで不具合が出る、ビルドできなくなる | 必要になったときだけ上げる |
+
+0bと0cの検証アプリは捨てずに残し、更新時の回帰確認に使います。モデルやllama.cppを更新したときは、検証アプリでの計測に加えて、統合したアプリでキャッシュが新しいモデルの訳に切り替わることと、翻訳中のキャンセルが効くことも確認します。
+
+targetSdkは36のまま据え置きます。37以上にすると、Android 17のローカルネットワーク権限への対応と、権限を拒否された場合の動作確認が必要になります。
+
+## リスクと縮退パス
+
+最大のリスクは無改造のtsnetがAndroidで安定しないことで、その場合も公式アプリ経由の直結で残りの計画は進められます。
+
+| リスク | 兆候 | 対応 |
+| --- | --- | --- |
+| 無改造のtsnetがAndroidで安定しない | 0bが撤退の基準に当たる | 埋め込みを見送り、公式Tailscaleアプリ経由の直結だけにする |
+| バックグラウンドでtsnetの起動が間に合わない | バックグラウンド同期の失敗が続く | 同期はフォアグラウンド復帰時を主にし、バックグラウンド同期は補助と割り切る |
+| 0.8Bが遅い、または発熱で速度が落ちる | 0cの計測が判断の目安を下回る | タイトルは充電中のバッチのみにし、本文はリモートエンジンを先に作る |
+| 短いタイトルで誤訳が出る | 使用中に気づく | プロンプトの `context` にフィード名と概要を渡す。原題は常に併記する |
+| 上流の修正が大きく乖離して取り込めない | cherry-pickが衝突する | 該当箇所だけ手で移植するか、取り込みを見送る |
+| loopbackのプロキシを端末内の他アプリが使う | なし(予防) | トークン必須、宛先はFreshRSSホスト1件に限定 |
+| モデルのライセンス条件に触れる | アプリを公開配布する場合 | モデルは同梱せずダウンロードさせる。商用利用はPFNへの登録が要る |
+
+## 参照
+
+- [prof18/feed-flow](https://github.com/prof18/feed-flow): モジュール依存と差し込み箇所は、タグ 1.21.0-fdroid(コミット cc8f15a、11月10日)で確認
+- [tailscale/tailscale-android](https://github.com/tailscale/tailscale-android): `libtailscale` のインターフェース取得とネットワーク変更通知
+- [bropines/tailsocks](https://github.com/bropines/tailsocks): Android上のユーザースペースTailscaleの先行実装(BSD 3-Clause)
+- [tailscale/tailscale#21129](https://github.com/tailscale/tailscale/issues/21129)、[#8126](https://github.com/tailscale/tailscale/issues/8126): AndroidでのnetmonとDNSの問題
+- [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp): `plamo3` アーキテクチャ対応と `examples/llama.android`
+- [pfnet/plamo-3-translate-0.8b モデルカード](https://huggingface.co/pfnet/plamo-3-translate-0.8b/blob/main/README_ja.md): 配布形式、サイズ、プロンプト形式、ライセンス
+- [PFN プレスリリース(2026年11月5日)](https://www.preferred.jp/en/news/pr20261105): PLaMo 3 Translateのオープンウェイト公開
+
+* [Tailscale: Key expiry](https://tailscale.com/docs/features/access-control/key-expiry)、[Auth keys](https://tailscale.com/kb/1085/auth-keys/): ノードキーとauth keyの有効期限
+* [Notebookcheck: Samsung Galaxy Z Fold8](https://www.notebookcheck.net/Samsung-Galaxy-Z-Fold8-Reviews-and-Specs.1352160.0.html)、[Digital Trends](https://www.digitaltrends.com/phones/samsung-galaxy-z-fold-8-everything-you-need-to-know-about-samsungs-palm-friendly-foldable-phone/): SoCとRAM構成
+
+- [FreshRSS: Dockerでのデプロイ手順](https://github.com/FreshRSS/FreshRSS/blob/edge/Docker): 公式イメージ、ポート、`CRON_MIN`、ボリューム
+- [Expo: Apple Developer Program explained](https://expo.dev/blog/apple-developer-program-explained-free-vs-paid)、[Apple: Choosing a Membership](https://developer.apple.com/support/compare-memberships): 無料のPersonal Teamの制約
+
+* [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)、[tailscale serveコマンド](https://tailscale.com/docs/reference/tailscale-cli/serve)、[Enabling HTTPS](https://tailscale.com/docs/how-to/set-up-https-certificates): FreshRSSの公開方法、`--bg` の永続化、証明書と公開ログ
+* [tailscale/tailscale PR #21152](https://github.com/tailscale/tailscale/pull/21152): Issue #21129の修正とその対象範囲
+* [Android: Local network permission](https://developer.android.com/privacy-and-security/local-network-permission): 適用条件はtargetSdk 37以上
