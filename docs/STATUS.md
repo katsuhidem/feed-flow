@@ -18,7 +18,7 @@
     - 済: タスク一覧から消した状態でのバックグラウンド同期。同期の Worker(`FeedDownloadWorker`)がバックグラウンドのまま tsnet を起動し、5件とも 200 で SUCCESS(23:56:54〜57)。ただし定期実行のジョブそのものは、Android がタスク一覧から消されたアプリの通信を `APP_BACKGROUND` でブロックしているため、ネットワーク条件が満たされず動かなかった(tsnet とは無関係で、上流の直結でも同じ)。確認は、同じ Worker をネットワーク条件なしで 30 秒後に1回動かす検証用ボタンで行った
     - 済: ログイン未完了と接続タイムアウトで、同期がエラーになり直結しない。公式 Tailscale アプリを接続した(直結なら届く)状態で、`Tailscale login required` と `Tailscale did not connect within 1s`(検証用の起動待ち1秒)のエラーになった。「起動の失敗」(tsbridge の Start が例外)は実機で再現していない。コード上は同じ経路(Error 状態 → ensureUp が例外 → I/O エラー、プロキシ選択は到達不能な宛先を返す)を通る
     - 済: 接続モード「システム」で 0a と同じ直結で動く(tsnet は停止し、同期とアイコンは公式アプリ経由で成功。`TailnetRoute` のログなし)
-  - 再ログインの後、管理画面のノード名は `tailfeed-1`(古い `tailfeed` は人が削除)。`tailfeed-1` の Expiry disabled は人の確認待ち
+  - 再ログインの後、管理画面のノード名は `tailfeed-1`(古い `tailfeed` は人が削除)。`tailfeed-1` は Expiry disabled(人が確認)
   - 端末のアプリは、確認の最後にシステムモードにしたまま
   - debug ビルドだけの検証用の操作(停止まで10秒、印の上限0.5秒、本文を2秒遅らせる、起動待ち1秒、30秒後のバックグラウンド同期、ログイン状態を消す)を FreshRSS アカウント画面に残している
 - Phase 0: 完了。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
@@ -51,7 +51,6 @@
 ## 人への依頼
 
 - phase/1 を確認し、main へマージしてください。
-- 管理画面で、`tailfeed-1` に「Expiry disabled」と表示されているかを確かめてください。
 
 ## 人からの連絡
 
