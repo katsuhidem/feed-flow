@@ -1,10 +1,10 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。0b のチェックポイント1〜8がすべて通り、撤退の判定を人に依頼)
+最終更新: 2026-11-14(エージェント。0b 完了。人の判定で tsnet の埋め込みを採用)
 
 ## 現在地
 
-- フェーズ: 0b。CP1〜CP8 がすべて通った(2026-11-14 20:31)。人による撤退の判定待ち(feed-flow と tsbridge の両方でブランチ phase/0b)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
+- フェーズ: 0b 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方でブランチ phase/0b(main へのマージ待ち)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
   - 計測値: 起動から疎通まで、初回 2.9〜3.4 秒、同じプロセスでの再起動 4.3〜5.0 秒、永続ノードのアプリ再起動 2.7〜2.8 秒、端末の再起動後 3.2 秒。回線切替からの回復 4.9〜8.8 秒(4回)。AAR 8.2MB(arm64)
   - `tailscale.com` のソースへのパッチは不要。netmap のディスクキャッシュを envknob(`TS_USE_CACHED_NETMAP=false`)で止めた。キャッシュから起動すると、1回おきにサービスの仮想IPに届かなかったため
@@ -27,16 +27,18 @@
 
 ## 次の作業
 
-1. 人の撤退の判定を受けて、0c(翻訳スパイク)に進む。0c は HUMAN_TASKS 8節のモデルの入手が前提
+1. 0c(翻訳スパイク)に進む。0c は HUMAN_TASKS 8節のモデルの入手が前提
 2. 0b と 0c の両方が終わったら、HUMAN_TASKS 9節(後片付けと PLAN への記録)を行う
 
 ## 人への依頼
 
-- docs/HUMAN_TASKS.md 7節「撤退の判定」を行ってください。../tsbridge/SPIKE_LOG.md を読み、埋め込みを採用するか見送るかを決めてください。報告してほしい結果: 採用か見送りか。
+- 0c を始める前に、docs/HUMAN_TASKS.md 8節「モデルの入手」を行ってください。報告してほしい結果: ファイル名、サイズ(約 0.57GB)、`shasum -a 256` の値。
+- feed-flow と tsbridge の phase/0b を確認し、それぞれ main へマージしてください。feed-flow は phase/0a を含みます。
 - phase/0a を確認し、main へマージしてください。0aの基準線です。main にマージされるまで、main には上流の workflows が残ります。
 
 ## 人からの連絡
 
+- 2026-11-14: 0b の撤退の判定は「採用する」。
 - 2026-11-14: `ls -l ~/.config/tsbridge/` を確認した。authkey、denylist、spike.env の3つだけで、すべて `-rw-------`。
 - 2026-11-14: 7節は1手ずつ対話で進める。CP6 で、ノード `tsb-spike` に Ephemeral の表示がなく、Expiry disabled と表示された。CP7 で端末を再起動した。CP8 で Wi-Fi のオフとオンを2往復した。
 - 2026-11-14: 0b から進める。
@@ -50,6 +52,7 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-14: 人の判定により、0b は埋め込み(tsnet)を採用した。根拠は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」。PLAN.md への記録は、HUMAN_TASKS 9節の手順どおり 0c の後にまとめて行う。
 - 2026-11-14: 0b の検証アプリは tsbridge リポジトリの `spikeapp/` に置いた。PLAN に置き場所の指定はなく、フォーク本体にスパイクのコードを入れないため。tsbridge のリモートには main が無かったので、手元の main(引き継ぎ時のコミット)をそのままプッシュし、作業は phase/0b で行っている。
 - 2026-11-14: tsbridge の公開 API に、PLAN にない `TailnetIP()` と `SetDebugLogs(bool)` を足した。CP2 の IP の表示と、伏せ字付きの backend ログの切り替えのため。Phase 1 で残すかは 0b の終わりに決める。
 - 2026-11-14: 人の決定により、`.github/workflows` と `renovate.json` を削除した。`.github` に残るもの(`actions/`、`scripts/`、`msix-*`、`FUNDING.yml`、AGENTS.md への symlink の `copilot-instructions.md`)は、workflows がなければ動かないので残した。
