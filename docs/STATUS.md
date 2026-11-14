@@ -35,10 +35,11 @@
 
 ## 人への依頼
 
-- docs/HUMAN_TASKS.md 8節「訳文を読む」を行ってください(対話で1本ずつ進行中)。訳文は docs/spike/eval-out/article-01.md 〜 10.md。結果はエージェントが docs/spike/eval-result.md に書く。
+- 0c の判断を決めてください(docs/spike/eval-result.md の最終行)。0.8B を使う / 2B で同じ10本を評価し直す / 本文翻訳には使わない、のいずれか。報告してほしい結果: どれにするか。
 
 ## 人からの連絡
 
+- 2026-11-14: 訳文の評価は人では難しかったため、別の AI に評価させた結果を渡す(docs/spike/eval-result.md に記録)。
 - 2026-11-14: 品質の確認はまず 0.8B で行う。2B は、0.8B の訳文を読んで品質が足りないと判断したときに入手する(HUMAN_TASKS 8節の手順どおり)。
 - 2026-11-14: 評価用の英語記事10本を選んだ(docs/spike/eval-articles.txt)。内訳の分類はエージェントに任せる。
 - 2026-11-14: 0c 用のモデルを入手した。`pfnet/plamo-3-translate-0.8b-GGUF` の `plamo-3-translate-0.8b-Q4_K_M.gguf`。ライセンスへの同意は求められなかった。
