@@ -33,11 +33,11 @@
 ## 人への依頼
 
 - docs/HUMAN_TASKS.md 7節「撤退の判定」を行ってください。../tsbridge/SPIKE_LOG.md を読み、埋め込みを採用するか見送るかを決めてください。報告してほしい結果: 採用か見送りか。
-- HUMAN_TASKS 7節「開始前の準備」の確認2項目目(`ls -l ~/.config/tsbridge/` のファイルがすべて `-rw-------`)は、エージェントからは確かめられなかった(コマンドが許可されなかった)。人が確かめてください。ファイルは現在3つ(authkey、denylist、spike.env)で、手順書の「2つのファイル」と数が合いません。
 - phase/0a を確認し、main へマージしてください。0aの基準線です。main にマージされるまで、main には上流の workflows が残ります。
 
 ## 人からの連絡
 
+- 2026-11-14: `ls -l ~/.config/tsbridge/` を確認した。authkey、denylist、spike.env の3つだけで、すべて `-rw-------`。
 - 2026-11-14: 7節は1手ずつ対話で進める。CP6 で、ノード `tsb-spike` に Ephemeral の表示がなく、Expiry disabled と表示された。CP7 で端末を再起動した。CP8 で Wi-Fi のオフとオンを2往復した。
 - 2026-11-14: 0b から進める。
 

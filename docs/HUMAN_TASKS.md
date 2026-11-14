@@ -269,7 +269,7 @@ TailscaleのmacOSアプリは、ログイン前には動きません。停電後
 3. エージェントへの指示に次を含める: `authkey` と `spike.env` の場所、ページサイズの値、試行ごとに `SPIKE_LOG.md` へ追記すること、接続情報をコミットしないこと。
 
 - [x] `adb shell pidof com.tailscale.ipn` が何も出力しない。
-- [ ] `ls -l ~/.config/tsbridge/` の2つのファイルが、どちらも `-rw-------` で始まる。
+- [x] `ls -l ~/.config/tsbridge/` のファイル(`authkey`、`spike.env`、pre-commit が読む `denylist`)が、すべて `-rw-------` で始まる。
 
 チェックポイント1〜5の間は、管理画面のMachinesに検証用のノードがEphemeralの表示付きで現れ、停止後にしばらくして消えます。進み具合は `SPIKE_LOG.md` で確かめます。
 
