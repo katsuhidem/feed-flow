@@ -388,7 +388,7 @@ git log --all --oneline -S 'tskey-auth'     # 何も出ない
 git grep -n '<tailnet名>'                   # 何も出ない
 ```
 
-- [ ] Keysの一覧に `tsbridge-spike` がない。
+- [x] Keysの一覧に `tsbridge-spike` がない。
 - [ ] 上の2つのコマンドが、フォークと `tsbridge` の両方で何も出力しない。
 - [ ] `docs/PLAN.md` に、表の項目がすべて書かれている。
 - [ ] 0bを見送った場合は、端末の公式Tailscaleアプリを接続した状態に戻した。
