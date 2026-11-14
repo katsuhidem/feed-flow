@@ -130,7 +130,8 @@ class TailnetManager(
     override suspend fun ensureUp(timeout: Duration) {
         if (_mode.value != TailnetMode.EMBEDDED) return
         start()
-        val result = withTimeoutOrNull(timeout) {
+        val wait = if (settings.debugShortEnsure) DEBUG_ENSURE else timeout
+        val result = withTimeoutOrNull(wait) {
             state.first {
                 it is TailnetState.Connected ||
                     it is TailnetState.Error ||
@@ -141,7 +142,7 @@ class TailnetManager(
             is TailnetState.Connected -> return
             is TailnetState.NeedsLogin -> throw TailnetUnavailableException("Tailscale login required")
             is TailnetState.Error -> throw TailnetUnavailableException(result.message)
-            else -> throw TailnetUnavailableException("Tailscale did not connect within $timeout")
+            else -> throw TailnetUnavailableException("Tailscale did not connect within $wait")
         }
     }
 
@@ -172,6 +173,24 @@ class TailnetManager(
 
     override fun startLogin() {
         scope.launch { start() }
+    }
+
+    /** Debug builds only: stop and delete the node state, so the next start needs a login. */
+    fun debugForgetLogin() {
+        cancelStopTimer()
+        scope.launch {
+            withContext(serial) {
+                if (running) {
+                    Tsbridge.stop()
+                    running = false
+                }
+                authUrl = null
+                stateDir.deleteRecursively()
+                evictPools()
+                _state.value = TailnetState.Stopped
+                log.i { "node state deleted (debug)" }
+            }
+        }
     }
 
     override fun stop() {
@@ -218,6 +237,13 @@ class TailnetManager(
         get() = settings.debugShortStop
         set(value) {
             settings.debugShortStop = value
+        }
+
+    /** Debug builds only: wait at most 1 s in ensureUp. */
+    var debugShortEnsure: Boolean
+        get() = settings.debugShortEnsure
+        set(value) {
+            settings.debugShortEnsure = value
         }
 
     /** Debug builds only: delay each FreshRSS response body by 2 s. */
@@ -303,5 +329,6 @@ class TailnetManager(
         val DEFAULT_MAX_HOLD = 3.minutes
         val DEBUG_STOP_DELAY = kotlin.time.Duration.parse("10s")
         val DEBUG_MAX_HOLD = kotlin.time.Duration.parse("500ms")
+        val DEBUG_ENSURE = kotlin.time.Duration.parse("1s")
     }
 }

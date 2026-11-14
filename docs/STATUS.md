@@ -1,10 +1,10 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。Phase 1 の完了条件を実機で確認中)
+最終更新: 2026-11-15(エージェント。Phase 1 の完了条件をすべて実機で確認)
 
 ## 現在地
 
-- フェーズ: Phase 1(作業中。ブランチ phase/1)。実装は一通り入り、`assembleFdroidDebug` が通る。実機に入れて、既定(システムモード)で起動しクラッシュしないことまで確認した。完了条件の確認はこれから
+- フェーズ: Phase 1 完了(ブランチ phase/1、main へのマージ待ち)。完了条件9つを実機で確認した(2026-11-14〜15、人と対話で)
   - 新規モジュール `tailnet/`: `TailnetController`(共通)、`TailnetManager`、`TailnetProxySelector`、`TailnetGateInterceptor`(起動待ちと利用中の印)、`TailnetProxyAuthenticator`、`NetworkStateReporter`、`TailnetSettings`。tsbridge は v0.1.0 の AAR を `tailnet/libs/` に置いた
   - 差し込み: GReader 用の OkHttp エンジン、画像ローダー、バックグラウンド同期の Worker(`SyncNetworkGate`)、FreshRSS アカウント画面の Tailscale の欄。変更した既存ファイルは FORK_CHANGES.md
   - 未対応: release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)。debug ビルドだけで確認している
@@ -15,9 +15,12 @@
     - 済: 記事本文の取得がプロキシを通っていない(本文と画像の表示中、`TailnetRoute` のログ 0 行、Go のプロキシへの要求 0 件)
     - 済: 同期中にバックグラウンドへ移しても、最後の通信が終わるまで tsnet は止まらない(検証用の「本文を2秒遅らせる」「停止まで10秒」で確認)
     - 済: 本文の受信が印の上限(検証用 0.5 秒)に達すると、通信をキャンセルしてから印を返し、その後で tsnet が止まる
-    - 確認中: タスク一覧から消した状態でのバックグラウンド同期(WorkManager の定期実行を待っている)
-    - 未: 起動の失敗、ログイン未完了、接続タイムアウトで同期がエラーになり、直結しないこと
-    - 未: 接続モード「システム」で 0a と同じ直結で動くこと
+    - 済: タスク一覧から消した状態でのバックグラウンド同期。同期の Worker(`FeedDownloadWorker`)がバックグラウンドのまま tsnet を起動し、5件とも 200 で SUCCESS(23:56:54〜57)。ただし定期実行のジョブそのものは、Android がタスク一覧から消されたアプリの通信を `APP_BACKGROUND` でブロックしているため、ネットワーク条件が満たされず動かなかった(tsnet とは無関係で、上流の直結でも同じ)。確認は、同じ Worker をネットワーク条件なしで 30 秒後に1回動かす検証用ボタンで行った
+    - 済: ログイン未完了と接続タイムアウトで、同期がエラーになり直結しない。公式 Tailscale アプリを接続した(直結なら届く)状態で、`Tailscale login required` と `Tailscale did not connect within 1s`(検証用の起動待ち1秒)のエラーになった。「起動の失敗」(tsbridge の Start が例外)は実機で再現していない。コード上は同じ経路(Error 状態 → ensureUp が例外 → I/O エラー、プロキシ選択は到達不能な宛先を返す)を通る
+    - 済: 接続モード「システム」で 0a と同じ直結で動く(tsnet は停止し、同期とアイコンは公式アプリ経由で成功。`TailnetRoute` のログなし)
+  - 再ログインの後、管理画面のノード名は `tailfeed-1`(古い `tailfeed` は人が削除)。`tailfeed-1` の Expiry disabled は人の確認待ち
+  - 端末のアプリは、確認の最後にシステムモードにしたまま
+  - debug ビルドだけの検証用の操作(停止まで10秒、印の上限0.5秒、本文を2秒遅らせる、起動待ち1秒、30秒後のバックグラウンド同期、ログイン状態を消す)を FreshRSS アカウント画面に残している
 - Phase 0: 完了。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
 - 0b: 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
@@ -42,12 +45,13 @@
 
 ## 次の作業
 
-1. 人と一緒に、PLAN の Phase 1 の完了条件を実機で1つずつ確かめる(対話で進める)
-2. 確かめた結果で不具合があれば直す。release ビルドの ProGuard 設定を足す
+1. release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)を足し、`assembleFdroidRelease` が通ることを確かめる(人が release を使い始める前に)
+2. Phase 2(タイトル翻訳)に進む
 
 ## 人への依頼
 
-- Phase 1 の完了条件の確認を、対話で1つずつ進めます。最初は、FreshRSS アカウント画面で「アプリ内のTailscaleで接続する」をオンにして、Tailscale にログインする手順です。
+- phase/1 を確認し、main へマージしてください。
+- 管理画面で、`tailfeed-1` に「Expiry disabled」と表示されているかを確かめてください。
 
 ## 人からの連絡
 
@@ -77,6 +81,9 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-15: Phase 1 の完了条件の確認で、本物の定期実行のジョブが Android の通信ブロック(`APP_BACKGROUND`)で動かなかったため、同じ Worker を検証用ボタンで動かして確認した。
+- 2026-11-14: 人の判断により、同期の途中でアプリがバックグラウンドへ移ると約5秒後から通信がタイムアウトする件は、Android の一般的な制約(バックグラウンドのアプリの凍結と通信制限)として Phase 1 では対処しない。tsnet に固有ではなく、上流の直結でも同じ制約を受ける。長い同期の取り損ねが問題になったら、手動の同期を WorkManager で実行する案を検討する。
+- 2026-11-14: 人の判断により、上流の GReaderClient が debug ビルドで要求の URL(tailnet名を含む)を logcat に出すことは許容する。上流由来で debug ビルドだけのため。tailnet モジュール自身のログは引き続き伏せ字にする。
 - 2026-11-14: 人の選択により、tsbridge の AAR はフォークにコミットする(`tailnet/libs/tsbridge-<版>.aar`、SHA-256 は `tailnet/libs/README.md`)。tsbridge は v0.1.0 のタグを打った。
 - 2026-11-14: Phase 1 の新規コードのパッケージは `io.github.katsuhidem.tailnet`(モジュール `tailnet/`)と `com.prof18.feedflow.android.tailnet`(androidApp 内の組み立て)。既定の接続モードはシステム(0a と同じ直結)で、人が設定画面で切り替える。
 - 2026-11-14: PLAN では `getGReaderModule` に `HttpClientEngine?` を渡すとしている。Koin の起動前にエンジンを作る必要があるため、`initKoin` にも同じ引数を足して渡した。バックグラウンド同期の Worker は、shared から tailnet に依存しないよう、`SyncNetworkGate` という小さなインターフェースを介して起動待ちと利用中の印を行う。
@@ -102,8 +109,6 @@
 
 ## 未解決の点
 
-- Phase 1: 同期の途中でアプリがバックグラウンドへ移ると、約5秒後からの通信がタイムアウトした(tsnet は動いたまま。0b の「バックグラウンドで凍結・通信遮断」と同じ現象と見られる)。普段の同期は1秒未満で終わるが、長い同期では取り損ねが起きる。対策の候補は、手動の同期も WorkManager で実行すること。人と相談する。
-- Phase 1: 上流の GReaderClient は debug ビルドで、要求の URL(tailnet名を含む)と本文を logcat に出す。AGENTS.md の「tailnet名をログに書かない」に照らして、debug ビルドのこのログを止めるかを人と相談する(tailnet モジュール自身のログは伏せ字にしている)。
 
 1. docs/PLAN.md の0aが参照する「エージェントへの引き継ぎ」タブが、リポジトリにない。workflows と renovate.json は人の決定で片付いたが、タブ自体は欠けたまま。
 2. フォークの GitHub Actions の設定は有効のまま。main にマージ済みで workflows はなくなったので動かない。設定を無効にするかは人の判断。

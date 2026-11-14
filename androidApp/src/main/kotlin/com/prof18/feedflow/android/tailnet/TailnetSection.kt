@@ -24,6 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.prof18.feedflow.shared.domain.FeedDownloadWorker
+import java.util.concurrent.TimeUnit
 import io.github.katsuhidem.tailnet.TailnetManager
 import io.github.katsuhidem.tailnet.TailnetMode
 import io.github.katsuhidem.tailnet.TailnetState
@@ -90,6 +94,22 @@ internal fun TailnetSection(manager: TailnetManager, modifier: Modifier = Modifi
                 DebugSwitch("検証用: 停止まで10秒", manager.debugShortStop) { manager.debugShortStop = it }
                 DebugSwitch("検証用: 印の上限0.5秒", manager.debugShortLease) { manager.debugShortLease = it }
                 DebugSwitch("検証用: 本文の受信を2秒遅らせる", manager.debugSlowBody) { manager.debugSlowBody = it }
+                DebugSwitch("検証用: 起動待ち1秒", manager.debugShortEnsure) { manager.debugShortEnsure = it }
+                OutlinedButton(
+                    onClick = {
+                        // Same worker as the periodic sync, once, in 30 s, without the network constraint
+                        // (Android blocks network for apps removed from recents until a job runs).
+                        WorkManager.getInstance(context).enqueue(
+                            OneTimeWorkRequestBuilder<FeedDownloadWorker>()
+                                .setInitialDelay(DEBUG_SYNC_DELAY_SECONDS, TimeUnit.SECONDS)
+                                .addTag("tailnet-debug-sync")
+                                .build(),
+                        )
+                    },
+                ) { Text("検証用: 30秒後にバックグラウンド同期") }
+                OutlinedButton(onClick = { manager.debugForgetLogin() }) {
+                    Text("検証用: Tailscaleのログイン状態を消す")
+                }
             }
         }
         HorizontalDivider()
@@ -119,3 +139,5 @@ private fun DebugSwitch(label: String, initial: Boolean, onChange: (Boolean) -> 
         )
     }
 }
+
+private const val DEBUG_SYNC_DELAY_SECONDS = 30L

@@ -30,7 +30,13 @@ class TailnetSettings(context: Context) {
         get() = prefs.getBoolean(KEY_DEBUG_SLOW, false)
         set(value) = prefs.edit().putBoolean(KEY_DEBUG_SLOW, value).apply()
 
+    /** Debug builds only: wait at most 1 s for the node to connect (a connect timeout). */
+    var debugShortEnsure: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_ENSURE, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_ENSURE, value).apply()
+
     private companion object {
+        const val KEY_DEBUG_ENSURE = "debug_short_ensure"
         const val KEY_DEBUG_SLOW = "debug_slow_body"
         const val KEY_DEBUG_STOP = "debug_short_stop"
         const val KEY_DEBUG_LEASE = "debug_short_lease"
