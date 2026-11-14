@@ -4,7 +4,7 @@
 
 ## 現在地
 
-- フェーズ: 0c 完了(ブランチ phase/0c)。判断の5点を docs/spike/TRANSLATE_LOG.md「0c の結論」に記録した。本文翻訳は通常 0.8B、高品質だけ 2B。次は HUMAN_TASKS 9節(後片付けと PLAN.md への記録)記録は docs/spike/TRANSLATE_LOG.md
+- フェーズ: Phase 0 完了(0a、0b、0c、HUMAN_TASKS 9節。ブランチ phase/0c で main へのマージ待ち)。結果は docs/PLAN.md「Phase 0 の結果」。未確認は Mac mini の再起動後の条件だけ。次は Phase 1(Tailscale 統合)記録は docs/spike/TRANSLATE_LOG.md
 - 0b: 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
   - 計測値: 起動から疎通まで、初回 2.9〜3.4 秒、同じプロセスでの再起動 4.3〜5.0 秒、永続ノードのアプリ再起動 2.7〜2.8 秒、端末の再起動後 3.2 秒。回線切替からの回復 4.9〜8.8 秒(4回)。AAR 8.2MB(arm64)
@@ -28,17 +28,17 @@
 
 ## 次の作業
 
-1. 0c 手順2〜12: llama.cpp を submodule(タグ `b12360`)で取り込み、JNI(`load`、`countTokens`、`translate`、`cancel`、`unload`)と検証アプリを作る
-2. 0c 手順13: 実機で計測表の値を取る
-3. 訳文が出せるようになったら、HUMAN_TASKS 8節「訳文を読む」を人に依頼する
-4. 0b と 0c の両方が終わったら、HUMAN_TASKS 9節(後片付けと PLAN への記録)を行う
+1. phase/0c が main にマージされたら、Phase 1(Tailscale 統合)のブランチ phase/1 を切り、docs/PLAN.md の Phase 1 の節を読んで始める
+2. Mac mini の再起動確認の結果が届いたら、PLAN.md「Phase 0 の結果」の Mac mini の行を更新する
 
 ## 人への依頼
 
-- docs/HUMAN_TASKS.md 9節の手順3で docs/PLAN.md「Phase 0 の結果」に記録した。内容を読んで確かめてください。続けて9節の確認(秘密情報の検索コマンド)を行ってください(対話で進行中)。
+- phase/0c を確認し、main へマージしてください。Phase 0(0a、0b、0c)の記録がすべて入っています。
+- docs/HUMAN_TASKS.md 5節の確認3の後半2項目(Mac mini を再起動し、ログイン画面のままと、ログイン後に、Fold8 から公開用のURLが開けるか)を行ってください。報告してほしい結果: それぞれ開けたかどうか。PLAN.md「Phase 0 の結果」の Mac mini の行に記録します。
 
 ## 人からの連絡
 
+- 2026-11-14: docs/PLAN.md「Phase 0 の結果」を読んで確かめた。問題なし。
 - 2026-11-14: HUMAN_TASKS 9節の手順1(`tsbridge-spike` の失効と authkey の削除)と手順2(ノード `tsb-spike` の削除)を行った。
 - 2026-11-14: 本文翻訳の既定は「通常 0.8B、高品質な翻訳だけ 2B に切り替え」。
 - 2026-11-14: 2B の訳文も別 AI に評価させた結果を渡す(docs/spike/eval-result.md に記録)。
