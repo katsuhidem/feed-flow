@@ -167,3 +167,4 @@ __pycache__/
 
 # Phase 0c: translated article text for human review (not for the public repo)
 docs/spike/eval-out/
+docs/spike/eval-out-*/

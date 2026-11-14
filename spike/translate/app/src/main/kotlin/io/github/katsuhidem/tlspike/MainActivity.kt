@@ -22,6 +22,7 @@ import java.util.concurrent.Executors
  *   am start -S -n io.github.katsuhidem.tlspike/.MainActivity --es suite all [--ei threads 4]
  * The model is read from getExternalFilesDir(null)/model.gguf (adb push).
  * suite: smoke | all | eval (eval reads articles.json from the same dir)
+ * model: file name in that dir (default model.gguf); eval writes eval-out-<model name>/
  */
 class MainActivity : Activity() {
 
@@ -39,9 +40,10 @@ class MainActivity : Activity() {
         if (savedInstanceState != null) return // do not rerun on recreation
         val suite = intent.getStringExtra("suite") ?: return out("idle: no suite")
         val threads = intent.getIntExtra("threads", 4)
+        val modelName = intent.getStringExtra("model") ?: "model.gguf"
         worker.execute {
             try {
-                run(suite, threads)
+                run(suite, threads, modelName)
             } catch (t: Throwable) {
                 out("M run_fail error=${t.javaClass.simpleName}:${t.message}")
             }
@@ -49,11 +51,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun run(suite: String, threads: Int) {
+    private fun run(suite: String, threads: Int, modelName: String) {
         val inputs = JSONObject(assets.open("inputs.json").bufferedReader().readText())
-        out("M device page_size=${Os.sysconf(OsConstants._SC_PAGESIZE)} sdk=${Build.VERSION.SDK_INT} threads=$threads")
+        out("M device page_size=${Os.sysconf(OsConstants._SC_PAGESIZE)} sdk=${Build.VERSION.SDK_INT} threads=$threads model=$modelName")
         mem("before_load")
-        val model = File(getExternalFilesDir(null), "model.gguf")
+        val model = File(getExternalFilesDir(null), modelName)
         val t0 = SystemClock.elapsedRealtime()
         if (!Translator.load(model.absolutePath, nCtx, threads)) return out("M load ok=false")
         out("M load ok=true ms=${SystemClock.elapsedRealtime() - t0}")
@@ -61,7 +63,8 @@ class MainActivity : Activity() {
         when (suite) {
             "smoke" -> smoke(inputs)
             "all" -> all(inputs)
-            "eval" -> evalArticles()
+            "speed" -> speed(inputs)
+            "eval" -> evalArticles(modelName.removeSuffix(".gguf"))
         }
         Translator.unload()
         mem("after_unload")
@@ -114,6 +117,21 @@ class MainActivity : Activity() {
         codeTest(inputs.getJSONArray("code_paragraphs"))
         zhTest(inputs.getJSONArray("zh_titles").strings())
         ratioTest(paras, titles)
+    }
+
+    /** Short speed check: 20 titles, then 10 paragraphs with thermal status. */
+    private fun speed(inputs: JSONObject) {
+        val titles = inputs.getJSONArray("titles").strings()
+        val paras = inputs.getJSONArray("paragraphs").strings()
+        out("M speed_start ${thermal()}")
+        val tt = SystemClock.elapsedRealtime()
+        titles.forEach { t -> Translator.translate(Prompt.build(t, "en"), budget(t)) }
+        out("M titles_20 total_ms=${SystemClock.elapsedRealtime() - tt} ${thermal()}")
+        for (i in 0 until 10) {
+            val src = paras[i % paras.size]
+            val r = timed(Prompt.build(src, "en"), src)
+            out("M para i=$i first_token_ms=${r.firstMs} tok_per_s=${r.tps()} gen_tokens=${r.res.tokens.size} finish=${r.res.finish} ${thermal()}")
+        }
     }
 
     private fun cancelTest(src: String) {
@@ -199,11 +217,11 @@ class MainActivity : Activity() {
      * Markdown to eval-out/ for adb pull. Article text never leaves the device
      * and the Mac; it is not committed.
      */
-    private fun evalArticles() {
+    private fun evalArticles(tag: String) {
         val dir = getExternalFilesDir(null)!!
         val src = File(dir, "articles.json")
         if (!src.exists()) return out("M eval missing=articles.json")
-        val outDir = File(dir, "eval-out").apply { mkdirs() }
+        val outDir = File(dir, "eval-out-$tag").apply { mkdirs() }
         val arr = JSONArray(src.readText())
         for (i in 0 until arr.length()) {
             val a = arr.getJSONObject(i)
