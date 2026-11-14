@@ -44,7 +44,7 @@ android {
     namespace = "com.prof18.feedflow.android"
     compileSdk = libs.versions.android.compile.sdk.get().toInt()
     defaultConfig {
-        applicationId = "com.prof18.feedflow"
+        applicationId = "io.github.katsuhidem.feedflow"
         minSdk = libs.versions.android.min.sdk.get().toInt()
         targetSdk = libs.versions.android.target.sdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -175,7 +175,6 @@ dependencies {
     implementation(libs.saket.swipe)
     implementation(libs.compose.unstyled.slider)
     implementation(libs.androidx.profileinstaller)
-    "baselineProfile"(project(":benchmarks"))
  
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.foundation)

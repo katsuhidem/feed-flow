@@ -29,7 +29,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="FeedFlow"
+        android:label="Tailfeed"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="false"
         android:theme="@style/Theme.FeedFlow"

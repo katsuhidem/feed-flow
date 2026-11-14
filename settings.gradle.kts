@@ -33,9 +33,8 @@ plugins {
 
 rootProject.name = "FeedFlow"
 include(":androidApp")
-include(":benchmarks")
+// fork: :benchmarks and :desktopApp are not built (see FORK_CHANGES.md)
 include(":shared")
-include(":desktopApp")
 include(":i18n")
 include(":core")
 include("database")
