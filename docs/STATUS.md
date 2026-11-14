@@ -1,6 +1,6 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。Phase 1 の実装を入れ、実機での確認を人に依頼)
+最終更新: 2026-11-14(エージェント。Phase 1 の完了条件を実機で確認中)
 
 ## 現在地
 
@@ -8,6 +8,16 @@
   - 新規モジュール `tailnet/`: `TailnetController`(共通)、`TailnetManager`、`TailnetProxySelector`、`TailnetGateInterceptor`(起動待ちと利用中の印)、`TailnetProxyAuthenticator`、`NetworkStateReporter`、`TailnetSettings`。tsbridge は v0.1.0 の AAR を `tailnet/libs/` に置いた
   - 差し込み: GReader 用の OkHttp エンジン、画像ローダー、バックグラウンド同期の Worker(`SyncNetworkGate`)、FreshRSS アカウント画面の Tailscale の欄。変更した既存ファイルは FORK_CHANGES.md
   - 未対応: release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)。debug ビルドだけで確認している
+  - 完了条件の確認(2026-11-14、人と対話で):
+    - 済: 公式 Tailscale アプリなしで、初回ログインから同期まで完了(ノード名 `tailfeed`、Expiry disabled)
+    - 済: フィードのアイコンが表示される(FreshRSS への通信は `route=proxy`)
+    - 済: tsnet が停止している状態から同期すると、自動で起動して成功(停止 23:13:53 → 同期で起動 23:14:00 → 接続 23:14:02)
+    - 済: 記事本文の取得がプロキシを通っていない(本文と画像の表示中、`TailnetRoute` のログ 0 行、Go のプロキシへの要求 0 件)
+    - 済: 同期中にバックグラウンドへ移しても、最後の通信が終わるまで tsnet は止まらない(検証用の「本文を2秒遅らせる」「停止まで10秒」で確認)
+    - 済: 本文の受信が印の上限(検証用 0.5 秒)に達すると、通信をキャンセルしてから印を返し、その後で tsnet が止まる
+    - 確認中: タスク一覧から消した状態でのバックグラウンド同期(WorkManager の定期実行を待っている)
+    - 未: 起動の失敗、ログイン未完了、接続タイムアウトで同期がエラーになり、直結しないこと
+    - 未: 接続モード「システム」で 0a と同じ直結で動くこと
 - Phase 0: 完了。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
 - 0b: 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
@@ -91,6 +101,9 @@
 - 2026-11-14 18:26: 5節確認3の1項目目に当たる確認。`/tmp/FreshRSS.log` は 18:13 に更新され、ユーザーの更新が OK で終わっている。再起動の2項目は未実施。
 
 ## 未解決の点
+
+- Phase 1: 同期の途中でアプリがバックグラウンドへ移ると、約5秒後からの通信がタイムアウトした(tsnet は動いたまま。0b の「バックグラウンドで凍結・通信遮断」と同じ現象と見られる)。普段の同期は1秒未満で終わるが、長い同期では取り損ねが起きる。対策の候補は、手動の同期も WorkManager で実行すること。人と相談する。
+- Phase 1: 上流の GReaderClient は debug ビルドで、要求の URL(tailnet名を含む)と本文を logcat に出す。AGENTS.md の「tailnet名をログに書かない」に照らして、debug ビルドのこのログを止めるかを人と相談する(tailnet モジュール自身のログは伏せ字にしている)。
 
 1. docs/PLAN.md の0aが参照する「エージェントへの引き継ぎ」タブが、リポジトリにない。workflows と renovate.json は人の決定で片付いたが、タブ自体は欠けたまま。
 2. フォークの GitHub Actions の設定は有効のまま。main にマージ済みで workflows はなくなったので動かない。設定を無効にするかは人の判断。

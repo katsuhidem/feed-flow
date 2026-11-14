@@ -111,19 +111,35 @@ class TailnetGateInterceptor(
             lease.release()
             throw e
         }
-        val wrapped = response.newBuilder().body(LeaseResponseBody(response.body, lease)).build()
+        val slowMs = if (manager.debugSlowBody) DEBUG_SLOW_BODY_MS else 0L
+        val wrapped = response.newBuilder().body(LeaseResponseBody(response.body, lease, slowMs)).build()
         responseRef.set(wrapped)
         return wrapped
     }
 }
 
+private const val DEBUG_SLOW_BODY_MS = 2_000L
+
 private class LeaseResponseBody(
     private val delegate: ResponseBody,
     private val lease: TailnetLease,
+    private val slowMs: Long,
 ) : ResponseBody() {
     private val source: BufferedSource by lazy {
         object : ForwardingSource(delegate.source()) {
+            private var delayed = false
+
             override fun read(sink: Buffer, byteCount: Long): Long {
+                if (slowMs > 0 && !delayed) {
+                    delayed = true
+                    try {
+                        Thread.sleep(slowMs) // debug only: a slow server body
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        lease.release()
+                        throw java.io.InterruptedIOException("cancelled")
+                    }
+                }
                 val n = try {
                     super.read(sink, byteCount)
                 } catch (e: IOException) {

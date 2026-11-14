@@ -89,6 +89,7 @@ internal fun TailnetSection(manager: TailnetManager, modifier: Modifier = Modifi
             if (BuildConfig.DEBUG) {
                 DebugSwitch("検証用: 停止まで10秒", manager.debugShortStop) { manager.debugShortStop = it }
                 DebugSwitch("検証用: 印の上限0.5秒", manager.debugShortLease) { manager.debugShortLease = it }
+                DebugSwitch("検証用: 本文の受信を2秒遅らせる", manager.debugSlowBody) { manager.debugSlowBody = it }
             }
         }
         HorizontalDivider()

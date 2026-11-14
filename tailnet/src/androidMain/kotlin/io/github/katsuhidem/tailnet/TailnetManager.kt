@@ -103,12 +103,14 @@ class TailnetManager(
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
+                    log.i { "app foreground" }
                     foreground = true
                     cancelStopTimer()
                     if (_mode.value == TailnetMode.EMBEDDED) scope.launch { start() }
                 }
 
                 override fun onStop(owner: LifecycleOwner) {
+                    log.i { "app background (leases=${leases.get()})" }
                     foreground = false
                     maybeScheduleStop()
                 }
@@ -144,7 +146,8 @@ class TailnetManager(
     }
 
     override fun acquire(maxHold: Duration, onExpire: () -> Unit): TailnetLease {
-        leases.incrementAndGet()
+        val n = leases.incrementAndGet()
+        log.d { "lease acquired (leases=$n)" }
         cancelStopTimer()
         val released = AtomicBoolean(false)
         lateinit var lease: TailnetLease
@@ -159,7 +162,9 @@ class TailnetManager(
             override fun release() {
                 if (!released.compareAndSet(false, true)) return
                 expiry.cancel()
-                if (leases.decrementAndGet() == 0) maybeScheduleStop()
+                val n = leases.decrementAndGet()
+                log.d { "lease released (leases=$n)" }
+                if (n == 0) maybeScheduleStop()
             }
         }
         return lease
@@ -213,6 +218,13 @@ class TailnetManager(
         get() = settings.debugShortStop
         set(value) {
             settings.debugShortStop = value
+        }
+
+    /** Debug builds only: delay each FreshRSS response body by 2 s. */
+    var debugSlowBody: Boolean
+        get() = settings.debugSlowBody
+        set(value) {
+            settings.debugSlowBody = value
         }
 
     /** Debug builds only: short lease limit (0.5 s) for the Phase 1 checks. */

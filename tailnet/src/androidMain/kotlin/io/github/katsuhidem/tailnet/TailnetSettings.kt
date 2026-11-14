@@ -25,7 +25,13 @@ class TailnetSettings(context: Context) {
         get() = prefs.getBoolean(KEY_DEBUG_LEASE, false)
         set(value) = prefs.edit().putBoolean(KEY_DEBUG_LEASE, value).apply()
 
+    /** Debug builds only: wait 2 s before reading each FreshRSS response body (a slow server). */
+    var debugSlowBody: Boolean
+        get() = prefs.getBoolean(KEY_DEBUG_SLOW, false)
+        set(value) = prefs.edit().putBoolean(KEY_DEBUG_SLOW, value).apply()
+
     private companion object {
+        const val KEY_DEBUG_SLOW = "debug_slow_body"
         const val KEY_DEBUG_STOP = "debug_short_stop"
         const val KEY_DEBUG_LEASE = "debug_short_lease"
         const val KEY_MODE = "mode"
