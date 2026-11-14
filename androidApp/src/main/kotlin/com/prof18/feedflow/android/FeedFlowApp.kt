@@ -10,6 +10,7 @@ import androidx.lifecycle.coroutineScope
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import com.prof18.feedflow.android.tailnet.TailnetSetup
 import com.prof18.feedflow.android.audio.AndroidAudioPlayer
 import com.prof18.feedflow.android.audio.AndroidSpeechAudioGenerator
 import com.prof18.feedflow.android.audio.SpeechAudioGenerating
@@ -64,6 +65,9 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
     private val browserManager by inject<BrowserManager>()
     private val pendingReadStatusActionRetrier by inject<PendingReadStatusActionRetrier>()
 
+    // fork: embedded Tailscale node (Phase 1)
+    private lateinit var tailnet: TailnetSetup
+
     override fun onCreate() {
         super.onCreate()
 
@@ -98,13 +102,17 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
             TelemetryHelper.initTelemetry(this)
         }
 
+        tailnet = TailnetSetup(this)
+
         initKoin(
             appConfig = appConfig,
+            greaderHttpEngine = tailnet.greaderEngine,
             platformSetup = {
                 workManagerFactory()
             },
             crashReportingLogWriter = CrashlyticsHelper.crashReportingLogWriter(),
             modules = listOf(
+                tailnet.koinModule,
                 module {
                     single<Context> { this@FeedFlowApp }
                     single<WebViewProfiles> { AndroidWebViewProfiles(this@FeedFlowApp) }
@@ -171,6 +179,8 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
             ),
         )
 
+        tailnet.install()
+
         feedDownloadWorkerEnqueuer.enqueueWork()
 
         with(ProcessLifecycleOwner.get()) {
@@ -219,6 +229,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
         return coilImageLoader(
             context = this@FeedFlowApp,
             debug = appEnvironment.isDebug(),
+            okHttpClient = tailnet.okHttpClient,
         )
     }
 }

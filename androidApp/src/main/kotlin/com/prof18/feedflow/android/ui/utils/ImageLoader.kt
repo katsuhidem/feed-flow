@@ -5,10 +5,12 @@ import coil3.PlatformContext
 import coil3.disk.DiskCache
 import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.network.httpHeaders
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import coil3.util.DebugLogger
+import okhttp3.OkHttpClient
 import okio.Path.Companion.toPath
 
 private val imageAcceptHeaderInterceptor = Interceptor { chain ->
@@ -30,9 +32,12 @@ private val imageAcceptHeaderInterceptor = Interceptor { chain ->
 fun coilImageLoader(
     context: PlatformContext,
     debug: Boolean,
+    // fork: client with the tailnet setup, so feed icons on the FreshRSS host load through the proxy
+    okHttpClient: OkHttpClient? = null,
 ): ImageLoader {
     return ImageLoader.Builder(context)
         .components {
+            if (okHttpClient != null) add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
             add(imageAcceptHeaderInterceptor)
             add(SvgDecoder.Factory())
         }

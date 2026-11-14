@@ -9,12 +9,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.prof18.feedflow.android.tailnet.TailnetSection
+import com.prof18.feedflow.android.tailnet.TailnetSetup
 import com.prof18.feedflow.android.ui.accounts.freshrss.FreshRssSyncContent
 import com.prof18.feedflow.android.ui.utils.LocalFeedFlowStrings
 import com.prof18.feedflow.core.model.DataNotFound
 import com.prof18.feedflow.core.model.NetworkFailure
 import com.prof18.feedflow.shared.presentation.FreshRssSyncViewModel
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -22,6 +25,7 @@ internal fun FreshRssSyncScreen(
     navigateBack: () -> Unit,
 ) {
     val viewModel = koinViewModel<FreshRssSyncViewModel>()
+    val tailnet = koinInject<TailnetSetup>()
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoginLoading by viewModel.loginLoading.collectAsStateWithLifecycle()
@@ -54,6 +58,7 @@ internal fun FreshRssSyncScreen(
         hasLocalSubscriptions = hasLocalSubscriptions,
         onBackClick = navigateBack,
         onLoginClick = { serverUrl, username, password ->
+            tailnet.pendingLoginUrl = serverUrl
             viewModel.login(username, password, serverUrl)
         },
         onDisconnectClick = {
@@ -62,5 +67,6 @@ internal fun FreshRssSyncScreen(
         snackbarHost = {
             SnackbarHost(snackbarHostState)
         },
+        headerContent = { TailnetSection(tailnet.manager) },
     )
 }

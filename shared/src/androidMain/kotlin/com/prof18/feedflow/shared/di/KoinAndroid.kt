@@ -184,6 +184,7 @@ internal actual fun getPlatformModule(appEnvironment: AppEnvironment): Module = 
             widgetRefreshState = get(),
             appContext = get(),
             workerParams = get(),
+            syncNetworkGate = getOrNull(),
         )
     }
 

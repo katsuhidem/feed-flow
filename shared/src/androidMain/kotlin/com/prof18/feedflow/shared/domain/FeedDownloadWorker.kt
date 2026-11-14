@@ -28,6 +28,8 @@ class FeedDownloadWorker internal constructor(
     private val widgetRefreshState: WidgetRefreshState,
     appContext: Context,
     workerParams: WorkerParameters,
+    // fork: brings up the tailnet before fetching (Phase 1)
+    private val syncNetworkGate: SyncNetworkGate? = null,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         val isManualRefresh = inputData.getBoolean(IS_MANUAL_REFRESH_KEY, false)
@@ -39,7 +41,8 @@ class FeedDownloadWorker internal constructor(
                 widgetRefreshState.setRefreshing(true)
                 widgetUpdater.update()
             }
-            feedFetcherRepository.fetchFeeds(forceRefresh = isManualRefresh)
+            val fetch: suspend () -> Unit = { feedFetcherRepository.fetchFeeds(forceRefresh = isManualRefresh) }
+            syncNetworkGate?.withNetwork(fetch) ?: fetch()
             if (!isManualRefresh) {
                 sendNotifications()
                 widgetUpdater.update()

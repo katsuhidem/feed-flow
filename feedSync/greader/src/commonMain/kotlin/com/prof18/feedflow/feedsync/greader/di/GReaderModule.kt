@@ -7,11 +7,16 @@ import com.prof18.feedflow.feedsync.greader.domain.GReaderRepository
 import com.prof18.feedflow.feedsync.greader.domain.mapping.ItemContentDTOMapper
 import com.prof18.feedflow.feedsync.networkcore.NetworkSettings
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngine
 import org.koin.core.module.Module
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
-fun getGReaderModule(appEnvironment: AppEnvironment) = module {
+// fork: httpClientEngine lets the Android app route FreshRSS through the tailnet proxy.
+fun getGReaderModule(
+    appEnvironment: AppEnvironment,
+    httpClientEngine: HttpClientEngine? = null,
+) = module {
     single {
         GReaderRepository(
             gReaderClient = GReaderClient(
@@ -20,6 +25,7 @@ fun getGReaderModule(appEnvironment: AppEnvironment) = module {
                 appEnvironment = appEnvironment,
                 dispatcherProvider = get(),
                 appVersion = get<AppConfig>().appVersion,
+                httpClientEngine = httpClientEngine,
             ),
             logger = get(parameters = { parametersOf("GReaderRepository") }),
             networkSettings = get(),

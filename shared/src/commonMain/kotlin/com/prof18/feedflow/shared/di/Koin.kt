@@ -94,6 +94,7 @@ import com.prof18.feedflow.shared.presentation.SearchViewModel
 import com.prof18.feedflow.shared.presentation.SyncAndStorageSettingsViewModel
 import com.prof18.feedflow.shared.utils.UserFeedbackReporter
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
@@ -118,9 +119,11 @@ fun initKoin(
     crashReportingLogWriter: LogWriter,
     modules: List<Module>,
     platformSetup: KoinApplication.() -> Unit = {},
+    // fork: engine for the FreshRSS (GReader) client; the Android app passes one that uses the tailnet.
+    greaderHttpEngine: HttpClientEngine? = null,
 ): KoinApplication {
     return startKoin {
-        modules(getAllModulesModules(appConfig, crashReportingLogWriter, modules))
+        modules(getAllModulesModules(appConfig, crashReportingLogWriter, modules, greaderHttpEngine))
         platformSetup()
     }
 }
@@ -129,12 +132,13 @@ internal fun getAllModulesModules(
     appConfig: AppConfig,
     crashReportingLogWriter: LogWriter,
     extraModules: List<Module> = emptyList(),
+    greaderHttpEngine: HttpClientEngine? = null,
 ): List<Module> {
     return extraModules +
         getCoreModule(appConfig) +
         dropboxModule +
         googleDriveModule(appConfig.appEnvironment) +
-        getGReaderModule(appConfig.appEnvironment) +
+        getGReaderModule(appConfig.appEnvironment, greaderHttpEngine) +
         getFeedbinModule(appConfig.appEnvironment) +
         getLoggingModule(appConfig, crashReportingLogWriter) +
         getPlatformModule(appConfig.appEnvironment) +

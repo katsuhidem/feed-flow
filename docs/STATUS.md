@@ -1,10 +1,14 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。Mac mini の再起動確認を記録し、Phase 1 のブランチを作成)
+最終更新: 2026-11-14(エージェント。Phase 1 の実装を入れ、実機での確認を人に依頼)
 
 ## 現在地
 
-- フェーズ: Phase 1(未着手。ブランチ phase/1)。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
+- フェーズ: Phase 1(作業中。ブランチ phase/1)。実装は一通り入り、`assembleFdroidDebug` が通る。実機に入れて、既定(システムモード)で起動しクラッシュしないことまで確認した。完了条件の確認はこれから
+  - 新規モジュール `tailnet/`: `TailnetController`(共通)、`TailnetManager`、`TailnetProxySelector`、`TailnetGateInterceptor`(起動待ちと利用中の印)、`TailnetProxyAuthenticator`、`NetworkStateReporter`、`TailnetSettings`。tsbridge は v0.1.0 の AAR を `tailnet/libs/` に置いた
+  - 差し込み: GReader 用の OkHttp エンジン、画像ローダー、バックグラウンド同期の Worker(`SyncNetworkGate`)、FreshRSS アカウント画面の Tailscale の欄。変更した既存ファイルは FORK_CHANGES.md
+  - 未対応: release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)。debug ビルドだけで確認している
+- Phase 0: 完了。Phase 0(0a、0b、0c、HUMAN_TASKS 9節)は完了し main にマージ済み。結果は docs/PLAN.md「Phase 0 の結果」記録は docs/spike/TRANSLATE_LOG.md
 - 0b: 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
   - 計測値: 起動から疎通まで、初回 2.9〜3.4 秒、同じプロセスでの再起動 4.3〜5.0 秒、永続ノードのアプリ再起動 2.7〜2.8 秒、端末の再起動後 3.2 秒。回線切替からの回復 4.9〜8.8 秒(4回)。AAR 8.2MB(arm64)
@@ -28,11 +32,12 @@
 
 ## 次の作業
 
-1. docs/PLAN.md の Phase 1 の節を読み、Phase 0 の結果(持ち越す点)と合わせて作業を始める
+1. 人と一緒に、PLAN の Phase 1 の完了条件を実機で1つずつ確かめる(対話で進める)
+2. 確かめた結果で不具合があれば直す。release ビルドの ProGuard 設定を足す
 
 ## 人への依頼
 
-- なし
+- Phase 1 の完了条件の確認を、対話で1つずつ進めます。最初は、FreshRSS アカウント画面で「アプリ内のTailscaleで接続する」をオンにして、Tailscale にログインする手順です。
 
 ## 人からの連絡
 
@@ -62,6 +67,10 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-14: 人の選択により、tsbridge の AAR はフォークにコミットする(`tailnet/libs/tsbridge-<版>.aar`、SHA-256 は `tailnet/libs/README.md`)。tsbridge は v0.1.0 のタグを打った。
+- 2026-11-14: Phase 1 の新規コードのパッケージは `io.github.katsuhidem.tailnet`(モジュール `tailnet/`)と `com.prof18.feedflow.android.tailnet`(androidApp 内の組み立て)。既定の接続モードはシステム(0a と同じ直結)で、人が設定画面で切り替える。
+- 2026-11-14: PLAN では `getGReaderModule` に `HttpClientEngine?` を渡すとしている。Koin の起動前にエンジンを作る必要があるため、`initKoin` にも同じ引数を足して渡した。バックグラウンド同期の Worker は、shared から tailnet に依存しないよう、`SyncNetworkGate` という小さなインターフェースを介して起動待ちと利用中の印を行う。
+- 2026-11-14: FreshRSS の URL はログインが成功してから保存されるため、最初のログインでは画面に入力された URL を tailnet の対象として使う(`TailnetSetup.pendingLoginUrl`)。
 - 2026-11-14: 人の判断により、Mac mini の停電後の自動起動はオフのまま。HUMAN_TASKS 2節の手順9(オンにする)とは異なる。停電後は人が電源を入れてログインするまで FreshRSS は使えない(FileVault のため自動ログインも使えない)。
 - 2026-11-14: 人の判定により、0b は埋め込み(tsnet)を採用した。根拠は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」。PLAN.md への記録は、HUMAN_TASKS 9節の手順どおり 0c の後にまとめて行う。
 - 2026-11-14: 0b の検証アプリは tsbridge リポジトリの `spikeapp/` に置いた。PLAN に置き場所の指定はなく、フォーク本体にスパイクのコードを入れないため。tsbridge のリモートには main が無かったので、手元の main(引き継ぎ時のコミット)をそのままプッシュし、作業は phase/0b で行っている。

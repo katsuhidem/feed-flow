@@ -166,6 +166,11 @@ baselineProfile {
 dependencies {
     implementation(project(":shared"))
     implementation(project(":i18n"))
+    // fork: Tailscale integration (Phase 1). The AAR version is pinned; see tailnet/libs/README.md.
+    implementation(project(":tailnet"))
+    implementation(project(":feedSync:networkcore"))
+    implementation(files("../tailnet/libs/tsbridge-0.1.0.aar"))
+    implementation(libs.ktor.client.okhttp)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.io.coil.compose)
     implementation(libs.io.coil.network)

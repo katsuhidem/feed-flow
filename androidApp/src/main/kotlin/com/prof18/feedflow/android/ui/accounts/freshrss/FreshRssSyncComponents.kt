@@ -55,6 +55,8 @@ fun FreshRssSyncContent(
     snackbarHost: @Composable () -> Unit = {
     },
     showNavigateBack: Boolean = true,
+    // fork: Tailscale connection settings (Phase 1)
+    headerContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -86,6 +88,7 @@ fun FreshRssSyncContent(
                 .padding(start = paddingValues.calculateLeftPadding(layoutDir))
                 .padding(end = paddingValues.calculateRightPadding(layoutDir)),
         ) {
+            headerContent()
             when (uiState) {
                 is AccountConnectionUiState.Linked -> ConnectedView(
                     uiState = uiState,
