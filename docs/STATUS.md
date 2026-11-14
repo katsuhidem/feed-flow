@@ -1,10 +1,14 @@
 # STATUS
 
-最終更新: 2026-11-14(エージェント。上流の workflows と renovate.json を削除し、0aのチェックリストを終えた)
+最終更新: 2026-11-14(エージェント。0b を開始し、チェックポイント4まで到達)
 
 ## 現在地
 
-- フェーズ: 0a 完了(ブランチ phase/0a。main へのマージ待ち)。完了条件(実機で購読一覧と未読記事が同期され、既読がFreshRSSに反映される)を満たし、チェックリストもすべて済んだ
+- フェーズ: 0b(作業中。feed-flow と tsbridge の両方でブランチ phase/0b)。詳細は ../tsbridge/SPIKE_LOG.md
+  - 到達: CP1〜CP4(CP2 は起動から running まで約 4.1〜4.3 秒、CP3 は購読 3 件)。AAR は 8.2MB(arm64)
+  - 未: CP5(同じプロセスでの2回目の `Start` が `needs-login` のまま止まる。調査中)。CP6〜CP8 は未着手
+  - これまでの CP2〜CP4 は、端末の公式 Tailscale アプリが動いたままの状態で確かめた。完了条件の確認は、公式アプリを止めてやり直す
+- 0a: 完了(ブランチ phase/0a。main へのマージ待ち)。完了条件(実機で購読一覧と未読記事が同期され、既読がFreshRSSに反映される)を満たし、チェックリストもすべて済んだ
 - 0aの基準線: phase/0a の先頭(fdroid debug、`io.github.katsuhidem.feedflow.debug`)
 - 0aのチェックリストの進み具合(PLAN のチェックボックスは未更新):
   - 済: フォークと main の作成、upstream の追加(0a以前)
@@ -22,14 +26,19 @@
 
 ## 次の作業
 
-1. 0b(tsnetスパイク)または0c(翻訳スパイク)に進む。どちらからでもよい(互いに依存しない)。0bは HUMAN_TASKS 7節「開始前の準備」が前提。0cは HUMAN_TASKS 8節のモデルの入手が前提
+1. 端末がつながったら、試行3の logcat から CP5 の2回目の `Start` の backend ログを読み、原因の仮説を立てて試行4を行う
+2. CP5 が通ったら、公式 Tailscale アプリを止めた状態で CP1〜CP5 をやり直す
+3. CP6(対話ログイン)の手前で、HUMAN_TASKS 7節のチェックポイント6を人に依頼する
 
 ## 人への依頼
 
+- Fold8 が試行3の途中(19:16 頃)で adb から外れました。USB 機器としては見えていますが、ADB インターフェースが出ていません。前回と同じく、端末で USB デバッグを入れ直してください。続けて USB で使うので、オートブロッカーと「USB デバッグの自動無効化」に当たる設定があれば確かめてください。報告してほしい結果: `adb devices` に `device` と出るか。
+- docs/HUMAN_TASKS.md 7節「開始前の準備」の手順2(端末の公式 Tailscale アプリを切断し、`adb shell am force-stop com.tailscale.ipn` で止める)を行ってください。報告してほしい結果: `adb shell pidof com.tailscale.ipn` が何も出さないこと。手順1の `spike.env` は作成済みと確認しました(CP3 が通ったため)。
 - phase/0a を確認し、main へマージしてください。0aの基準線です。main にマージされるまで、main には上流の workflows が残ります。
-- 0bと0cのどちらから進めるかを決めてください。
 
 ## 人からの連絡
+
+- 2026-11-14: 0b から進める。
 
 - 2026-11-14: `.github/workflows` と `renovate.json` は両方削除する。
 - 2026-11-14: HUMAN_TASKS 6節を一通り確認し、問題なさそう。
@@ -40,6 +49,8 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-14: 0b の検証アプリは tsbridge リポジトリの `spikeapp/` に置いた。PLAN に置き場所の指定はなく、フォーク本体にスパイクのコードを入れないため。tsbridge のリモートには main が無かったので、手元の main(引き継ぎ時のコミット)をそのままプッシュし、作業は phase/0b で行っている。
+- 2026-11-14: tsbridge の公開 API に、PLAN にない `TailnetIP()` と `SetDebugLogs(bool)` を足した。CP2 の IP の表示と、伏せ字付きの backend ログの切り替えのため。Phase 1 で残すかは 0b の終わりに決める。
 - 2026-11-14: 人の決定により、`.github/workflows` と `renovate.json` を削除した。`.github` に残るもの(`actions/`、`scripts/`、`msix-*`、`FUNDING.yml`、AGENTS.md への symlink の `copilot-instructions.md`)は、workflows がなければ動かないので残した。
 
 ## 確認の記録
