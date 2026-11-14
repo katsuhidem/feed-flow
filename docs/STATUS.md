@@ -4,12 +4,12 @@
 
 ## 現在地
 
-- フェーズ: 0b 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方でブランチ phase/0b(main へのマージ待ち)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
+- フェーズ: 0b 完了。CP1〜CP8 がすべて通り(2026-11-14 20:31)、人の判定で tsnet の埋め込みを採用した。feed-flow と tsbridge の両方で main にマージ済み(2026-11-14、人)。詳細と計測値は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」
   - 完了条件(CP1〜CP8、起動から疎通までの秒数、AAR のサイズの記録、公式 Tailscale アプリを止めた状態での確認)は満たした
   - 計測値: 起動から疎通まで、初回 2.9〜3.4 秒、同じプロセスでの再起動 4.3〜5.0 秒、永続ノードのアプリ再起動 2.7〜2.8 秒、端末の再起動後 3.2 秒。回線切替からの回復 4.9〜8.8 秒(4回)。AAR 8.2MB(arm64)
   - `tailscale.com` のソースへのパッチは不要。netmap のディスクキャッシュを envknob(`TS_USE_CACHED_NETMAP=false`)で止めた。キャッシュから起動すると、1回おきにサービスの仮想IPに届かなかったため
   - Phase 1 に持ち越す点: 画面オフやブラウザが前面のときにアプリが凍結され、tsnet も止まる。対話ログインの後にアプリへ戻る導線が要る。端末では AdGuard の VPN(tun0)が常時動いており、tsnet はこの上でも動いた
-- 0a: 完了(ブランチ phase/0a。main へのマージ待ち)。完了条件(実機で購読一覧と未読記事が同期され、既読がFreshRSSに反映される)を満たし、チェックリストもすべて済んだ
+- 0a: 完了(main にマージ済み)。完了条件(実機で購読一覧と未読記事が同期され、既読がFreshRSSに反映される)を満たし、チェックリストもすべて済んだ
 - 0aの基準線: phase/0a の先頭(fdroid debug、`io.github.katsuhidem.feedflow.debug`)
 - 0aのチェックリストの進み具合(PLAN のチェックボックスは未更新):
   - 済: フォークと main の作成、upstream の追加(0a以前)
@@ -33,11 +33,10 @@
 ## 人への依頼
 
 - 0c を始める前に、docs/HUMAN_TASKS.md 8節「モデルの入手」を行ってください。報告してほしい結果: ファイル名、サイズ(約 0.57GB)、`shasum -a 256` の値。
-- feed-flow と tsbridge の phase/0b を確認し、それぞれ main へマージしてください。feed-flow は phase/0a を含みます。
-- phase/0a を確認し、main へマージしてください。0aの基準線です。main にマージされるまで、main には上流の workflows が残ります。
 
 ## 人からの連絡
 
+- 2026-11-14: feed-flow と tsbridge の phase/0b を main にマージした。0c に進め、HUMAN_TASKS 8節を1つずつ対話で進める。
 - 2026-11-14: 0b の撤退の判定は「採用する」。
 - 2026-11-14: `ls -l ~/.config/tsbridge/` を確認した。authkey、denylist、spike.env の3つだけで、すべて `-rw-------`。
 - 2026-11-14: 7節は1手ずつ対話で進める。CP6 で、ノード `tsb-spike` に Ephemeral の表示がなく、Expiry disabled と表示された。CP7 で端末を再起動した。CP8 で Wi-Fi のオフとオンを2往復した。
@@ -67,7 +66,7 @@
 ## 未解決の点
 
 1. docs/PLAN.md の0aが参照する「エージェントへの引き継ぎ」タブが、リポジトリにない。workflows と renovate.json は人の決定で片付いたが、タブ自体は欠けたまま。
-2. フォークの GitHub Actions の設定は有効のまま。main へのマージ後は workflows がなくなるので動かない。設定を無効にするかは人の判断。
+2. フォークの GitHub Actions の設定は有効のまま。main にマージ済みで workflows はなくなったので動かない。設定を無効にするかは人の判断。
 3. PLAN の「上流の AGENTS.md と CLAUDE.md に追記する」に対し、実際は置き換えて上流の内容を docs/upstream/AGENTS.upstream.md に移している。「コードの規約」の節は空のまま。
 4. PLAN 0a のチェックボックスが未チェックのまま。チェックの更新が「PLAN の決定の書き換え」に当たるか不明なため、進み具合はこの STATUS の「現在地」に書いている。
 5. ダミーの google-services.json のパッケージ名は `com.prof18.feedflow` のままだが、applicationId を変えた後も fdroid の debug ビルドは通る。googlePlay フレーバーと release はビルドしていない。
