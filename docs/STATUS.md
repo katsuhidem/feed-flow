@@ -32,10 +32,11 @@
 
 ## 人への依頼
 
-- 0c を始める前に、docs/HUMAN_TASKS.md 8節「モデルの入手」を行ってください。報告してほしい結果: ファイル名、サイズ(約 0.57GB)、`shasum -a 256` の値。
+- docs/HUMAN_TASKS.md 8節「評価用の記事を選ぶ」を行ってください(対話で進行中)。
 
 ## 人からの連絡
 
+- 2026-11-14: 0c 用のモデルを入手した。`pfnet/plamo-3-translate-0.8b-GGUF` の `plamo-3-translate-0.8b-Q4_K_M.gguf`。ライセンスへの同意は求められなかった。
 - 2026-11-14: feed-flow と tsbridge の phase/0b を main にマージした。0c に進め、HUMAN_TASKS 8節を1つずつ対話で進める。
 - 2026-11-14: 0b の撤退の判定は「採用する」。
 - 2026-11-14: `ls -l ~/.config/tsbridge/` を確認した。authkey、denylist、spike.env の3つだけで、すべて `-rw-------`。
@@ -57,6 +58,8 @@
 - 2026-11-14: 人の決定により、`.github/workflows` と `renovate.json` を削除した。`.github` に残るもの(`actions/`、`scripts/`、`msix-*`、`FUNDING.yml`、AGENTS.md への symlink の `copilot-instructions.md`)は、workflows がなければ動かないので残した。
 
 ## 確認の記録
+
+- 2026-11-14 20:44: `~/models/plamo-3-translate-0.8b-Q4_K_M.gguf` は 573126848 バイト(547MiB、約 0.57GB)、先頭は `GGUF`。SHA-256 は `70891ec70dc7ab4205745a38307867c2881b99239f20327927633abfe4bc9ec6` で、Hugging Face の API が返す LFS の値と一致。
 
 - 2026-11-14 19:01: 人の6節の確認の後、アプリのDB(run-as で複製)と FreshRSS の `cli/user-info.php` を照合。購読フィード 3 と 3、既読 37 と 37、未読 13 と 13 で一致。3件のフィードのアイコンURLは、すべてサービスのURLで始まる。アプリの既読の送信待ちは 0 件。Tailscale を切断したときの失敗は、人の確認だけで、エージェントは確かめていない。
 - 2026-11-14 18:50: 端末は adb で `device`、Android 17、ページサイズ 4096。最初は USB デバッグの口(ADB インターフェース)が出ておらず、人が端末で USB デバッグを入れ直して解消した。
