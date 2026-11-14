@@ -19,8 +19,8 @@ FeedFlowをリリースタグ `1.21.0-fdroid` で分岐し、Tailscale接続と�
 | 翻訳モデル | `plamo-3-translate-0.8b` GGUF Q4\_K\_M(0.57GB) | スマホ向けの最小サイズ。2BのQ4\_K\_M(1.81GB)も0cで計測し、速度が足りれば既定にする。Q2\_Kは精度低下があるため不採用 |
 | 翻訳の見せ方 | タイトルは自動、本文はオンデマンドの対訳表示 | 0.8Bの速度が未計測のため、重い処理は明示操作に寄せる |
 | 対象端末 | Galaxy Z Fold8(Snapdragon 8 Elite Gen 5、RAM 12GBまたは16GB、Android 17) | 0.8Bには十分な余裕があり、2Bも端末内で動かせる見込み |
-| FreshRSSのURL | Tailscale ServeによるHTTPS。FreshRSSは127.0.0.1だけで待ち受ける | FreshRSSの入口をtailnetだけに限定できる。証明書の取得はTailscaleが行い、埋め込みと直結で同じURLを使える |
-| ノード認証 | ブラウザでの対話ログイン。ログイン後に管理画面でキーの有効期限を無効にする | 秘密のキーを扱わずに済み、ACLの編集も要らない |
+| FreshRSSのURL | Tailscale Services のサービス `svc:freshrss` によるHTTPS。URLはMac miniのマシン名ではなく、サービス名の `freshrss.<tailnet名>.ts.net` を使う。FreshRSSは127.0.0.1だけで待ち受ける | FreshRSSの入口をtailnetだけに限定できる。証明書の取得はTailscaleが行い、埋め込みと直結で同じURLを使える。URLがホストのマシン名に依存しないので、ホストを替えてもURLは変わらず、マシン名がURLと証明書に出ない |
+| ノード認証 | ブラウザでの対話ログイン。ログイン後に管理画面でキーの有効期限を無効にする | 秘密のキーを扱わずに済む。サービスへのアクセスは0aで設定したgrantで許可しており、アプリのノードのためにポリシーを変更しない |
 
 &#91;embedded content: 構成図 · アプリ内の5要素と外部の3つ\]
 
@@ -77,15 +77,19 @@ GoツールチェーンとgomobileをGradleビルドから切り離すため、`
 
 ### FreshRSSの到達URL
 
-FreshRSSはMac mini内の `127.0.0.1:8080` だけで待ち受け、Tailscale Serveでtailnetに公開します。アプリに入れるURLは次の形です。
+FreshRSSはMac mini内の `127.0.0.1:8080` だけで待ち受け、Tailscale Services のサービス `svc:freshrss` としてtailnetに公開します([Tailscale Services](https://tailscale.com/kb/1552/tailscale-services))。Mac miniはこのサービスのホストです。アプリに入れるURLは、マシン名ではなくサービス名を使った次の形です。
 
 ```
-https://<マシン名>.<tailnet名>.ts.net/api/greader.php
+https://freshrss.<tailnet名>.ts.net/api/greader.php
 ```
 
-- Dockerの公開先を `127.0.0.1` に限定し、家庭内LANからの入口を作らない。tailnetからの入口はServeだけになる。
-- 証明書はTailscaleがLet's Encryptから取得する。前提として、管理画面のDNSページでMagicDNSとHTTPS証明書を有効にする([Enabling HTTPS](https://tailscale.com/docs/how-to/set-up-https-certificates))。
-- HTTPS証明書を有効にすると、マシン名とtailnet名が公開の証明書透明性ログに載る。Mac miniのマシン名に個人を特定できる語を入れない。
+この計画で「FreshRSSホスト」と書いたものは、サービス名のホスト `freshrss.<tailnet名>.ts.net` を指します。Mac miniのマシン名のURL(`<マシン名>.<tailnet名>.ts.net`)ではFreshRSSに届きません。
+
+- Dockerの公開先を `127.0.0.1` に限定し、家庭内LANからの入口を作らない。tailnetからの入口はサービスだけになる。
+- サービスのホストはタグ付きの端末でなければならない。Mac miniには `tag:service-host` を付ける。タグ付きの端末は、ノードキーの有効期限が既定で無効になる。
+- サービスへのアクセスは、ポリシーのgrant(`dst` に `svc:freshrss`)で許可する。Fold8と、0bでアプリが作るノードは、どちらも自分のアカウントの端末として、このgrantの `src` に入るようにする。
+- 証明書はTailscaleが取得する。前提として、管理画面のDNSページでMagicDNSとHTTPS証明書を有効にする([Enabling HTTPS](https://tailscale.com/docs/how-to/set-up-https-certificates))。
+- HTTPS証明書を有効にすると、証明書の名前(サービス名とtailnet名)が公開の証明書透明性ログに載る。サービス名とMac miniのマシン名に、個人を特定できる語を入れない。
 - 埋め込み(tsnet)でも直結(公式アプリ)でも同じURLを使う。埋め込みでは、loopbackプロキシの `CONNECT` 経路を通る。
 
 ### MacでのFreshRSS構築
@@ -113,23 +117,26 @@ volumes:
 ```
 
 1. Mac miniにOrbStackを入れ、上の `compose.yaml` を置いたフォルダで `docker compose up -d` を実行する。
-2. Mac miniにTailscaleアプリを入れてログインし、管理画面のMachinesでマシン名とtailnet名を確認する。
+2. Mac miniにTailscaleアプリ(v1.86以降)を入れてログインし、管理画面のMachinesでマシン名とtailnet名を確認する。
 3. 管理画面のDNSページで、MagicDNSとHTTPS証明書を有効にする。
-4. ターミナルで `tailscale serve --bg 8080` を実行する。`--bg` を付けると、再起動後も設定が残る([tailscale serve](https://tailscale.com/docs/reference/tailscale-cli/serve))。
-5. 公開用のURL `https://<マシン名>.<tailnet名>.ts.net/` をブラウザで開き、FreshRSSの初期設定を済ませる。データベースは既定のSQLiteで足りる。`localhost` や、OrbStackがコンテナに自動で割り当てる orb.local のURLからは初期設定しない。
-6. `base_url` を公開用のURLに合わせる。`docker exec --user www-data freshrss ./cli/reconfigure.php --base-url https://<マシン名>.<tailnet名>.ts.net` を実行し、FreshRSSのシステム設定画面で値を確かめる。`/api/greader.php` は付けない。
-7. FreshRSSの認証設定でAPIアクセスを許可し、プロフィール画面でAPIパスワードを設定する。
-8. tailnetにつないだ別の端末から公開用のURLを開き、FreshRSSが表示されることを確かめる。
-9. 同じLANの別の端末から `http://<Mac miniのLAN内IP>:8080/` を開き、つながらないことを確かめる。
-10. フィードを1つ登録し、APIの購読一覧が返す `iconUrl` に `localhost` や `:8080` が含まれないことを確かめる。
+4. ポリシーに、`tag:service-host` の所有者(`tagOwners`)と、`svc:freshrss` へのアクセスを許すgrantを足す。Mac miniに `tag:service-host` を付ける。
+5. 管理画面のServicesページで、サービス `freshrss`(ポート443)を定義する。
+6. ターミナルで `tailscale serve --service=svc:freshrss --https=443 127.0.0.1:8080` を実行する。サービスへのserveは自動でバックグラウンドの設定になり、ホストとしての広告も同時に行われる([tailscale serve](https://tailscale.com/docs/reference/tailscale-cli/serve))。
+7. 管理画面のServicesページで、Mac miniをこのサービスのホストとして承認する。ポリシーの `autoApprovers` で自動承認にしてもよい。
+8. 公開用のURL `https://freshrss.<tailnet名>.ts.net/` をブラウザで開き、FreshRSSの初期設定を済ませる。データベースは既定のSQLiteで足りる。`localhost` や、OrbStackがコンテナに自動で割り当てる orb.local のURL、マシン名のURLからは初期設定しない。
+9. `base_url` を公開用のURLに合わせる。`docker exec --user www-data freshrss ./cli/reconfigure.php --base-url https://freshrss.<tailnet名>.ts.net` を実行し、FreshRSSのシステム設定画面で値を確かめる。`/api/greader.php` は付けない。
+10. FreshRSSの認証設定でAPIアクセスを許可し、プロフィール画面でAPIパスワードを設定する。
+11. tailnetにつないだ別の端末から公開用のURLを開き、FreshRSSが表示されることを確かめる。
+12. 同じLANの別の端末から `http://<Mac miniのLAN内IP>:8080/` を開き、つながらないことを確かめる。
+13. フィードを1つ登録し、APIの購読一覧が返す `iconUrl` が公開用のURLで始まり、`localhost` や `:8080` を含まないことを確かめる。
 
-手順5と6が要る理由: FreshRSSは `base_url` をインストール時の環境から決め、APIが返すフィードアイコンのURLをこの値から組み立てます([FreshRSS: 設定ファイルの項目](https://freshrss.github.io/FreshRSS/en/admins/17_configs_not_ui.html))。`localhost` のままだと、スマホからアイコンを取得できず、プロキシの宛先照合にも通りません。
+手順8と9が要る理由: FreshRSSは `base_url` をインストール時の環境から決め、APIが返すフィードアイコンのURLをこの値から組み立てます([FreshRSS: 設定ファイルの項目](https://freshrss.github.io/FreshRSS/en/admins/17_configs_not_ui.html))。`localhost` やマシン名のURLのままだと、スマホからアイコンを取得できず、プロキシの宛先照合にも通りません。
 
 注意点が4つあります。
 
 - `CRON_MIN` を指定しないと、フィードの自動更新が動かない。
 - Mac miniがスリープしている間は、同期もフィードの更新も止まる。システム設定で、ディスプレイがオフのときに自動でスリープしないようにする。
-- 再起動後もFreshRSSが立ち上がるよう、OrbStackをログイン時に起動する設定(Start at login)にする。再起動後は `tailscale serve status` でServeの設定が残っていることも確認する。
+- 再起動後もFreshRSSが立ち上がるよう、OrbStackをログイン時に起動する設定(Start at login)にする。再起動後は `tailscale serve status` で `svc:freshrss` の設定が残っていることも確認する。サービスの設定が再起動後に残るかは公式文書に明記がないため、0aで実際に確かめる。
 - ログイン時の起動は、Mac miniにログインするまで動かない。停電などで再起動した後、ログイン画面で止まっている間はFreshRSSを使えない。再起動してから使えるようになるまでの条件を0aで実際に確かめ、必要なら自動ログインを設定する。
 
 ## Phase 0b tsnetスパイク
@@ -186,7 +193,9 @@ func SetNetworkState(interfacesJSON, dnsServers string)
 | Wi-Fiとモバイルの切替を検知できない | `ConnectivityManager.NetworkCallback` から `SetNetworkState` を呼び、netmonへ変更イベントを注入する | tailscale-android の `libtailscale/net.go` |
 | 診断ログがTailscaleへ送信される | 起動前に環境変数 `TS_NO_LOGS_NO_SUPPORT=true` を設定する | TailSocks の `appctr/daemon.go` |
 
-スパイクで確かめる点が3つあります。
+スパイクで確かめる点が4つあります。
+
+- **tsnetからサービスに届くか**: サービスはMac mini自身のアドレスではなく、サービス用の仮想IPで提供される。公式文書は、v1.94以降のクライアントでは `accept-routes` の有効化が不要としているが、tsnetのようなユーザー空間のクライアントについては書いていない。固定したバージョンで、`srv.Dial` がサービス名を仮想IPへ解決して接続できるかを、チェックポイント3で確かめる。
 
 - **ネットワーク変更の通知**: `Server.Sys()` からnetmonを取り、`InjectEvent()` を呼ぶ経路がある。ただし `Sys()` は安定APIではないと明記されている。固定したバージョンで使え、更新時に追随できるかを確かめる。
 - **無改造で足りるか**: TailSocksは v1.104.5 のソースを手元に置いて差し替えている。無改造の `tailscale.com` モジュールで足りるかを確かめる。
@@ -198,7 +207,7 @@ Android 17のローカルネットワーク保護は、targetSdkが36のまま�
 
 - 認証は対話ログインにする。アプリが出すログインURLをブラウザで開き、普段のTailscaleアカウントでログインする。
 - ログイン後、管理画面のMachinesで該当ノードのメニューから「Disable Key Expiry」を選ぶ。既定ではノードキーが180日で失効し、再ログインが要るため([Key expiry](https://tailscale.com/docs/features/access-control/key-expiry))。
-- アクセス制御のポリシーは既定のままでよい。ポリシーを変更していなければ、自分の端末同士は通信できる。
+- アクセス制御のポリシーは、0aで足した `svc:freshrss` へのgrantのまま変更しない。対話ログインのノードも、auth keyで参加するノード(タグなし)も、自分のアカウントの端末として扱われるので、Fold8と同じくgrantの対象に入る。
 - auth keyは使わない。キー自体が最長90日で失効し、秘密の文字列をアプリに貼る手間が増える([Auth keys](https://tailscale.com/kb/1085/auth-keys/))。
 - タグとACLで到達先をFreshRSSだけに絞る構成は、必要を感じたら後から足す。プロキシ側で宛先を1件に限定しているので、最初は省略できる。
 
@@ -226,7 +235,7 @@ Android 17のローカルネットワーク保護は、targetSdkが36のまま�
 
 * ephemeralの試験(1〜5)と対話ログインの試験(6〜8)では、状態ディレクトリを分ける。6以降ではauth keyの設定も外す。tsnetは保存済みの登録状態を再利用するので、同じ状態を使うと対話ログインの検証にならない。
 
-- FreshRSSは開発機と同じMac miniで動くので、チェックポイント3は必ずtailnet名のURLで確認する。`localhost` やエミュレータからホストを指すアドレス(`10.0.2.2`)で確認すると、tsnetを通らずに合格してしまう。
+- FreshRSSは開発機と同じMac miniで動くので、チェックポイント3は必ずサービスのURL(`https://freshrss.<tailnet名>.ts.net`)で確認する。`localhost` やエミュレータからホストを指すアドレス(`10.0.2.2`)で確認すると、tsnetを通らずに合格してしまう。
 
 ### 完了条件
 
@@ -686,6 +695,7 @@ targetSdkは36のまま据え置きます。37以上にすると、Android 17の
 - [FreshRSS: Dockerでのデプロイ手順](https://github.com/FreshRSS/FreshRSS/blob/edge/Docker): 公式イメージ、ポート、`CRON_MIN`、ボリューム
 - [Expo: Apple Developer Program explained](https://expo.dev/blog/apple-developer-program-explained-free-vs-paid)、[Apple: Choosing a Membership](https://developer.apple.com/support/compare-memberships): 無料のPersonal Teamの制約
 
+* [Tailscale Services](https://tailscale.com/kb/1552/tailscale-services): サービスのホストの条件(タグ付きの端末)、grantによるアクセス許可、`--service` でのserve
 * [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)、[tailscale serveコマンド](https://tailscale.com/docs/reference/tailscale-cli/serve)、[Enabling HTTPS](https://tailscale.com/docs/how-to/set-up-https-certificates): FreshRSSの公開方法、`--bg` の永続化、証明書と公開ログ
 * [tailscale/tailscale PR #21152](https://github.com/tailscale/tailscale/pull/21152): Issue #21129の修正とその対象範囲
 * [Android: Local network permission](https://developer.android.com/privacy-and-security/local-network-permission): 適用条件はtargetSdk 37以上
