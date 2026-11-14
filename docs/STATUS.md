@@ -32,10 +32,11 @@
 
 ## 人への依頼
 
-- Mac mini の「停電後に自動的に起動」が、`pmset -g` では `autorestart 0`(オフ)でした。HUMAN_TASKS 2節の手順9ではオンにすることになっています。意図どおりか確かめ、オンにする場合はシステム設定 → エネルギー で有効にしてください。報告してほしい結果: `pmset -g | grep autorestart` の値。
+- なし
 
 ## 人からの連絡
 
+- 2026-11-14: Mac mini の停電後の自動起動(`autorestart`)はオフのままにする。
 - 2026-11-14: Mac mini を再起動した。ログイン画面のままでは Fold8 から接続できず、ログインして2〜3分たつと接続できた。phase/0c を main にマージした。
 - 2026-11-14: docs/PLAN.md「Phase 0 の結果」を読んで確かめた。問題なし。
 - 2026-11-14: HUMAN_TASKS 9節の手順1(`tsbridge-spike` の失効と authkey の削除)と手順2(ノード `tsb-spike` の削除)を行った。
@@ -61,6 +62,7 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-14: 人の判断により、Mac mini の停電後の自動起動はオフのまま。HUMAN_TASKS 2節の手順9(オンにする)とは異なる。停電後は人が電源を入れてログインするまで FreshRSS は使えない(FileVault のため自動ログインも使えない)。
 - 2026-11-14: 人の判定により、0b は埋め込み(tsnet)を採用した。根拠は ../tsbridge/SPIKE_LOG.md の「0b の結果のまとめ」。PLAN.md への記録は、HUMAN_TASKS 9節の手順どおり 0c の後にまとめて行う。
 - 2026-11-14: 0b の検証アプリは tsbridge リポジトリの `spikeapp/` に置いた。PLAN に置き場所の指定はなく、フォーク本体にスパイクのコードを入れないため。tsbridge のリモートには main が無かったので、手元の main(引き継ぎ時のコミット)をそのままプッシュし、作業は phase/0b で行っている。
 - 2026-11-14: tsbridge の公開 API に、PLAN にない `TailnetIP()` と `SetDebugLogs(bool)` を足した。CP2 の IP の表示と、伏せ字付きの backend ログの切り替えのため。Phase 1 で残すかは 0b の終わりに決める。
