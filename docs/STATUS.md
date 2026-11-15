@@ -1,13 +1,19 @@
 # STATUS
 
-最終更新: 2026-11-15(エージェント。Phase 1 の完了条件をすべて実機で確認)
+最終更新: 2026-11-15(エージェント。Phase 2 の共通ロジックと Android 側の土台を実装。実機未確認)
 
 ## 現在地
 
-- フェーズ: Phase 1 完了(ブランチ phase/1、main へのマージ待ち)。完了条件9つを実機で確認した(2026-11-14〜15、人と対話で)
+- フェーズ: Phase 2(作業中。ブランチ phase/2)。実機をつながずに進められる部分だけを実装した。**実機では一度も動かしていない**
+  - 済: 新規モジュール `translation/`(KMP)。`PlamoPromptBuilder`、`TokenBudget`、`LanguageGate`、`TranslationPlanner`(キーを作る唯一の関数)、`TranslationCache`(専用の SQLDelight DB、失敗の記録、フィード別設定、300ms でまとめる変更通知)、`TranslationEngine`、`TranslationQueue`、`TitleTranslator`。JVM の単体テスト 73 件がすべて通る(`./gradlew :translation:jvmTest`)
+  - 済: 新規モジュール `llama/`(Android ライブラリ)。submodule の llama.cpp を arm64、CPU、Release でビルドする JNI。`:llama:assembleDebug` が通り、`libllamabridge.so` ができる
+  - 済: `translation/` の Android 側: `LlamaCppEngine`、`ModelStore`(Range での再開、SHA-256 検証、0.8B と 2B のカタログ)。`:translation:compileAndroidMain` が通る
+  - 未: アプリへの組み込み(Koin の組み立て、DB ドライバの生成)、タイムラインへの差し込み(`FeedItem` に訳題、`FeedStateRepository` で埋める、変更通知の購読、行の表示)、設定画面、同期後のバッチの Worker。既存コードはまだ何も変えていない(`settings.gradle.kts` への `include` だけ)
+  - 未: PLAN の完了条件8つはすべて未確認(実機が要る)
+- Phase 1: 完了し main にマージ済み。完了条件9つを実機で確認した(2026-11-14〜15、人と対話で)
   - 新規モジュール `tailnet/`: `TailnetController`(共通)、`TailnetManager`、`TailnetProxySelector`、`TailnetGateInterceptor`(起動待ちと利用中の印)、`TailnetProxyAuthenticator`、`NetworkStateReporter`、`TailnetSettings`。tsbridge は v0.1.0 の AAR を `tailnet/libs/` に置いた
   - 差し込み: GReader 用の OkHttp エンジン、画像ローダー、バックグラウンド同期の Worker(`SyncNetworkGate`)、FreshRSS アカウント画面の Tailscale の欄。変更した既存ファイルは FORK_CHANGES.md
-  - 未対応: release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)。debug ビルドだけで確認している
+  - release ビルドの ProGuard: 追加の設定は不要と確認した(2026-11-15)。`:androidApp:minifyFdroidReleaseWithR8` が通り、tsbridge の AAR 同梱のルールで `go.*` と tsbridge のクラスが名前を保ったまま残る。release の APK の作成には署名用の `keystore.properties`(秘密情報。人が用意する)が要るため、`assembleFdroidRelease` は試していない
   - 完了条件の確認(2026-11-14、人と対話で):
     - 済: 公式 Tailscale アプリなしで、初回ログインから同期まで完了(ノード名 `tailfeed`、Expiry disabled)
     - 済: フィードのアイコンが表示される(FreshRSS への通信は `route=proxy`)
@@ -45,12 +51,14 @@
 
 ## 次の作業
 
-1. release ビルド用の ProGuard の keep 設定(gomobile の生成クラス)を足し、`assembleFdroidRelease` が通ることを確かめる(人が release を使い始める前に)
-2. Phase 2(タイトル翻訳)に進む
+1. アプリへの組み込み: androidApp に翻訳の組み立て(`TranslationDB` の `AndroidSqliteDriver`、`ModelStore`、`LlamaCppEngine`、`TranslationQueue`、`TitleTranslator`)を Koin モジュールとして足す。Phase 1 の `TailnetSetup` と同じ形
+2. タイムライン: shared には `translation/` への依存を足さず、Phase 1 の `SyncNetworkGate` と同じく小さなインターフェースを shared に置いて androidApp で実装する案。`FeedItem` に `translatedTitle` を足し、`FeedStateRepository` の読み込み(ページは 40 件)で埋め、`changes.batched(300)` を購読する
+3. 設定画面(モデルのダウンロードと削除、常体/敬体、フィード別のオン/オフ、ライセンスの表示)と、充電中のバッチの Worker(`ContentPrefetchWorker` に合わせる)
+4. 実機で PLAN の Phase 2 の完了条件を確かめる
 
 ## 人への依頼
 
-- phase/1 を確認し、main へマージしてください。
+- なし(次の実機確認までは不要)。release ビルドを使う場合は、署名用の `keystore.properties` を用意してください(リポジトリには入れない)。
 
 ## 人からの連絡
 
@@ -72,6 +80,7 @@
 - 2026-11-14: 0b から進める。
 
 - 2026-11-14: `.github/workflows` と `renovate.json` は両方削除する。
+- 2026-11-15: Fold8 をつないでいないので、実機確認が要らない部分から進める。
 - 2026-11-14: HUMAN_TASKS 6節を一通り確認し、問題なさそう。
 - 2026-11-14: URLは端末名ではなく freshrss のサービスにした。それが正になるように計画を書き直す。
 
@@ -80,6 +89,11 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-15: ProGuard の確認(Phase 1 の残り)は別ブランチを作らず phase/2 で行った。設定の変更は不要だった。
+- 2026-11-15: llama.cpp の JNI は、`translation/` ではなく別の Android ライブラリ `llama/` に置いた。KMP の Android ライブラリのプラグインが CMake(externalNativeBuild)を扱えないため。
+- 2026-11-15: キャッシュの `model_rev` は、インストール済みファイルの実測ハッシュではなく、選んだモデルの `ModelSpec.sha256` を使う。ダウンロード時にこの値と照合しているので同じ値になり、モデルを消した後でもキャッシュ済みの訳題を表示できる。
+- 2026-11-15: 中国語の言語コードは、モデルカードの一覧に合わせて `zh-hans` と `zh-hant` にした(0c のスパイクでは `zh` を使っていた)。フィードの文字列に含まれる `<|plamo:` は、制御トークンとして解釈されないようゼロ幅スペースで崩す。
+- 2026-11-15: SQLite の UPSERT は使わない(minSdk 26 の SQLite は 3.18)。
 - 2026-11-15: Phase 1 の完了条件の確認で、本物の定期実行のジョブが Android の通信ブロック(`APP_BACKGROUND`)で動かなかったため、同じ Worker を検証用ボタンで動かして確認した。
 - 2026-11-14: 人の判断により、同期の途中でアプリがバックグラウンドへ移ると約5秒後から通信がタイムアウトする件は、Android の一般的な制約(バックグラウンドのアプリの凍結と通信制限)として Phase 1 では対処しない。tsnet に固有ではなく、上流の直結でも同じ制約を受ける。長い同期の取り損ねが問題になったら、手動の同期を WorkManager で実行する案を検討する。
 - 2026-11-14: 人の判断により、上流の GReaderClient が debug ビルドで要求の URL(tailnet名を含む)を logcat に出すことは許容する。上流由来で debug ビルドだけのため。tailnet モジュール自身のログは引き続き伏せ字にする。
