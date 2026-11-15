@@ -19,4 +19,6 @@ data class FeedItem(
     val isBookmarked: Boolean,
     val contentDirection: ContentDirection? = null,
     val audioUrl: String? = null,
+    // fork (Phase 2): translated title shown above the original in the timeline
+    val translatedTitle: String? = null,
 )

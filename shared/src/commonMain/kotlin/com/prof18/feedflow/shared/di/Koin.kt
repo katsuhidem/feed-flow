@@ -709,6 +709,7 @@ private fun getCoreModule(appConfig: AppConfig) = module {
             feedAppearanceSettingsRepository = get(),
             dateFormatter = get(),
             logger = getWith("FeedStateRepository"),
+            titleTranslations = getOrNull(),
         )
     }
 

@@ -37,6 +37,8 @@ internal class FeedStateRepository(
     private val settingsRepository: SettingsRepository,
     private val feedAppearanceSettingsRepository: FeedAppearanceSettingsRepository,
     private val dateFormatter: DateFormatter,
+    // fork (Phase 2): translated titles for the timeline
+    private val titleTranslations: TimelineTitleTranslations? = null,
 ) {
     private val errorMutableState: MutableSharedFlow<ErrorState> = MutableSharedFlow()
     val errorState = errorMutableState.asSharedFlow()
@@ -69,6 +71,37 @@ internal class FeedStateRepository(
     private var lastFetchedUrlHash: String? = null
     private var hasMorePages: Boolean = true
     private var isLoadingMore: Boolean = false
+
+    init {
+        // fork (Phase 2): swap in titles as their translations are stored; the list position is kept.
+        titleTranslations?.setListener { ids, translations ->
+            updateFeedState(incrementListVersion = false) { current ->
+                if (current.none { it.id in ids }) {
+                    current
+                } else {
+                    current.map { item ->
+                        if (item.id in ids) item.copy(translatedTitle = translations[item.id]) else item
+                    }.toImmutableList()
+                }
+            }
+        }
+    }
+
+    // fork (Phase 2): fills translated titles from the cache before the list is published.
+    private suspend fun withTitleTranslations(items: List<FeedItem>): List<FeedItem> {
+        val source = titleTranslations ?: return items
+        val translated = try {
+            source.lookup(items)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Throwable) {
+            logger.d(e) { "Title translation lookup failed" }
+            emptyMap()
+        }
+        source.onItemsLoaded(items)
+        if (translated.isEmpty()) return items
+        return items.map { item -> translated[item.id]?.let { item.copy(translatedTitle = it) } ?: item }
+    }
 
     suspend fun getFeeds() {
         reloadFeeds()
@@ -106,14 +139,15 @@ internal class FeedStateRepository(
             if (feeds.isNotEmpty()) {
                 updateMutableState.update { FinishedFeedUpdateStatus }
             }
-            updateFeedState {
+            val items = withTitleTranslations(
                 feeds.map {
                     it.toFeedItem(
                         dateFormatter = dateFormatter,
                         settings = settings,
                     )
-                }.toImmutableList()
-            }
+                },
+            )
+            updateFeedState { items.toImmutableList() }
             true
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -187,13 +221,15 @@ internal class FeedStateRepository(
             }
             updateCursor(feeds)
             val settings = feedAppearanceSettingsRepository.getFeedItemMappingSettings()
-            updateFeedState(incrementListVersion = false) { currentItems ->
-                val newList = feeds.map {
+            val newList = withTitleTranslations(
+                feeds.map {
                     it.toFeedItem(
                         dateFormatter = dateFormatter,
                         settings = settings,
                     )
-                }.toImmutableList()
+                },
+            )
+            updateFeedState(incrementListVersion = false) { currentItems ->
                 (currentItems + newList).toImmutableList()
             }
         } catch (e: Throwable) {

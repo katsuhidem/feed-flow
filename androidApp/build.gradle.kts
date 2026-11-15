@@ -42,6 +42,8 @@ val escapedRevenueCatTestStoreApiKey = revenueCatTestStoreApiKey
 
 android {
     namespace = "com.prof18.feedflow.android"
+    // fork: the NDK that built :llama, so its debug symbols are stripped when packaging (54 MB -> 6 MB)
+    ndkVersion = "30.0.16248370"
     compileSdk = libs.versions.android.compile.sdk.get().toInt()
     defaultConfig {
         applicationId = "io.github.katsuhidem.feedflow"
@@ -171,6 +173,9 @@ dependencies {
     implementation(project(":feedSync:networkcore"))
     implementation(files("../tailnet/libs/tsbridge-0.1.0.aar"))
     implementation(libs.ktor.client.okhttp)
+    // fork: on-device translation (Phase 2). :database is for the batch job's list of untranslated titles.
+    implementation(project(":translation"))
+    implementation(project(":database"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.io.coil.compose)
     implementation(libs.io.coil.network)

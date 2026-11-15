@@ -118,13 +118,15 @@ internal fun TitleSubtitleAndImageRow(
         ) {
             feedItem.title?.let { title ->
                 Text(
-                    text = title,
+                    // fork (Phase 2): the translated title leads when there is one
+                    text = feedItem.translatedTitle ?: title,
                     fontSize = feedFontSize.feedTitleFontSize.sp,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall,
                     lineHeight = (feedFontSize.feedTitleFontSize + 4).sp,
                     color = feedItem.textColor(currentFeedFilter),
                 )
+                OriginalTitle(feedItem, feedFontSize, currentFeedFilter)
             }
 
             val paddingTop = when {
@@ -206,13 +208,15 @@ internal fun FeedItemImageCardContent(
             feedItem.title?.let { title ->
                 Text(
                     modifier = Modifier.padding(top = if (hasSourceRow) Spacing.small else 0.dp),
-                    text = title,
+                    // fork (Phase 2): the translated title leads when there is one
+                    text = feedItem.translatedTitle ?: title,
                     fontSize = feedFontSize.feedTitleFontSize.sp,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall,
                     lineHeight = (feedFontSize.feedTitleFontSize + 4).sp,
                     color = feedItem.textColor(currentFeedFilter),
                 )
+                OriginalTitle(feedItem, feedFontSize, currentFeedFilter)
             }
 
             feedItem.subtitle?.let { subtitle ->
@@ -354,5 +358,26 @@ private fun UnreadDot(
             .size(size)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primary),
+    )
+}
+
+/** fork (Phase 2): the original title under a translated one, smaller and lighter. */
+@Composable
+private fun OriginalTitle(
+    feedItem: FeedItem,
+    feedFontSize: FeedFontSizes,
+    currentFeedFilter: FeedFilter,
+) {
+    val original = feedItem.title ?: return
+    if (feedItem.translatedTitle == null) return
+    Text(
+        modifier = Modifier.padding(top = 2.dp),
+        text = original,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        fontSize = feedFontSize.feedDescFontSize.sp,
+        lineHeight = (feedFontSize.feedDescFontSize + 4).sp,
+        style = MaterialTheme.typography.bodySmall,
+        color = feedItem.textColor(currentFeedFilter).copy(alpha = 0.7f),
     )
 }

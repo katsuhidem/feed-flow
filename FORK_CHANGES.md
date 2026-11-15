@@ -15,6 +15,14 @@
 | `.gitignore` | 0c の評価用の訳文(記事本文を含む)の出力先 `docs/spike/eval-out/` を除外 | 0c |
 | `settings.gradle.kts` | `:tailnet` を `include` | 1 |
 | `settings.gradle.kts` | `:translation` と `:llama` を `include` | 2 |
+| `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/FeedItem.kt` | `translatedTitle` を追加(既定値 null) | 2 |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/FeedStateRepository.kt` | `titleTranslations` 引数を追加。一覧を公開する前に訳題を埋め(`withTitleTranslations`)、通知で差し替える(`init`) | 2 |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `FeedStateRepository` に `getOrNull<TimelineTitleTranslations>()` を渡す | 2 |
+| `androidApp/build.gradle.kts` | `:translation` と `:database` への依存、`ndkVersion` を追加 | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TranslationSetup` を作り、Koin モジュールを渡し、起動後に `install()` | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/home/components/list/FeedItemCommon.kt` | 訳題があれば主に表示し、原題を下に小さく表示(`OriginalTitle`) | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreenContent.kt` | `footerContent` 引数を追加 | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す | 2 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/utils/ImageLoader.kt` | `coilImageLoader` に `okHttpClient` 引数を追加し、`OkHttpNetworkFetcherFactory` で使う | 1 |
@@ -27,4 +35,4 @@
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 
-新規に足したもの(既存ファイルの変更ではない): `.gitmodules` と submodule `third_party/llama.cpp`(タグ `b12360`)、翻訳スパイクの検証アプリ `spike/translate/`(フォーク本体のビルドには含めない)。Phase 1 のモジュール `tailnet/`(tsbridge の AAR を含む)、`shared/src/androidMain/.../domain/SyncNetworkGate.kt`、`androidApp/src/main/kotlin/com/prof18/feedflow/android/tailnet/`。 Phase 2 のモジュール `translation/`(KMP、専用の SQLDelight DB)と `llama/`(llama.cpp の JNI)。
+新規に足したもの(既存ファイルの変更ではない): `.gitmodules` と submodule `third_party/llama.cpp`(タグ `b12360`)、翻訳スパイクの検証アプリ `spike/translate/`(フォーク本体のビルドには含めない)。Phase 1 のモジュール `tailnet/`(tsbridge の AAR を含む)、`shared/src/androidMain/.../domain/SyncNetworkGate.kt`、`androidApp/src/main/kotlin/com/prof18/feedflow/android/tailnet/`。 Phase 2 のモジュール `translation/`(KMP、専用の SQLDelight DB)と `llama/`(llama.cpp の JNI)。 `shared/src/commonMain/.../domain/feed/TimelineTitleTranslations.kt`、`shared/src/commonTest/.../FeedStateRepositoryTitleTranslationTest.kt`、`androidApp/src/main/kotlin/com/prof18/feedflow/android/translation/`。

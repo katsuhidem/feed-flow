@@ -42,6 +42,8 @@ internal fun ReadingBehaviorScreenContent(
     setMarkReadWhenScrolling: (Boolean) -> Unit,
     setShowReadItem: (Boolean) -> Unit,
     setHideReadItems: (Boolean) -> Unit,
+    // fork (Phase 2): translation settings
+    footerContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -135,6 +137,10 @@ internal fun ReadingBehaviorScreenContent(
                         null
                     },
                 )
+            }
+
+            item {
+                footerContent()
             }
 
             item {

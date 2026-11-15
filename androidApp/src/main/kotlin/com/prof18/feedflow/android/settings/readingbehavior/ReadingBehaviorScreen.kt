@@ -1,5 +1,7 @@
 package com.prof18.feedflow.android.settings.readingbehavior
 
+import com.prof18.feedflow.android.translation.TranslationSettingsSection
+import com.prof18.feedflow.android.translation.TranslationSetup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,8 +23,11 @@ internal fun ReadingBehaviorScreen(
     val browserListState by browserManager.browserListState.collectAsStateWithLifecycle()
     val strings = LocalFeedFlowStrings.current
 
+    val translation = koinInject<TranslationSetup>()
+
     ReadingBehaviorScreenContent(
         navigateBack = navigateBack,
+        footerContent = { TranslationSettingsSection(translation) },
         state = state,
         browsers = browserListState.map { browser ->
             if (browser.id == BrowserIds.IN_APP_BROWSER) {

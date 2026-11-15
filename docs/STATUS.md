@@ -1,6 +1,6 @@
 # STATUS
 
-最終更新: 2026-11-15(エージェント。Phase 2 の共通ロジックと Android 側の土台を実装。実機未確認)
+最終更新: 2026-11-15(エージェント。Phase 2 をアプリに組み込み、ビルドとテストまで確認。実機未確認)
 
 ## 現在地
 
@@ -8,8 +8,11 @@
   - 済: 新規モジュール `translation/`(KMP)。`PlamoPromptBuilder`、`TokenBudget`、`LanguageGate`、`TranslationPlanner`(キーを作る唯一の関数)、`TranslationCache`(専用の SQLDelight DB、失敗の記録、フィード別設定、300ms でまとめる変更通知)、`TranslationEngine`、`TranslationQueue`、`TitleTranslator`。JVM の単体テスト 73 件がすべて通る(`./gradlew :translation:jvmTest`)
   - 済: 新規モジュール `llama/`(Android ライブラリ)。submodule の llama.cpp を arm64、CPU、Release でビルドする JNI。`:llama:assembleDebug` が通り、`libllamabridge.so` ができる
   - 済: `translation/` の Android 側: `LlamaCppEngine`、`ModelStore`(Range での再開、SHA-256 検証、0.8B と 2B のカタログ)。`:translation:compileAndroidMain` が通る
-  - 未: アプリへの組み込み(Koin の組み立て、DB ドライバの生成)、タイムラインへの差し込み(`FeedItem` に訳題、`FeedStateRepository` で埋める、変更通知の購読、行の表示)、設定画面、同期後のバッチの Worker。既存コードはまだ何も変えていない(`settings.gradle.kts` への `include` だけ)
-  - 未: PLAN の完了条件8つはすべて未確認(実機が要る)
+  - 済(ビルドのみ): アプリへの組み込み。`androidApp/.../translation/` に `TranslationSetup`(組み立てと Koin)、`TimelineTitleTranslationsImpl`、`TitleTranslationWorker`(充電中のバッチ)、`TranslationPrefs`、`TranslationSettingsSection`(設定)。`assembleFdroidDebug` が通る(debug APK 74.9MB。`libllamabridge.so` 6.5MB)
+  - 済(テストあり): タイムラインへの差し込み。shared に小さなインターフェース `TimelineTitleTranslations` を置き、`FeedStateRepository` が一覧を公開する前に訳題を埋め、保存の通知で差し替える。`FeedItem.translatedTitle` を追加。`:shared:jvmTest --tests '*FeedStateRepository*'` は 25 件(既存 21、追加 4)すべて通る
+  - 済(ビルドのみ): 行の表示(訳題を主、原題を小さく副)。設定は「読み方」の設定画面の末尾(翻訳のオン/オフ、モデルのダウンロード・中断・削除、常体/敬体、ライセンスの表示)
+  - 未: フィード別のオン/オフの画面(保存先 `feed_translation_meta` と判定は実装済み。操作する UI がない)
+  - 未: PLAN の完了条件8つはすべて未確認(実機が要る)。**実機では一度も動かしていない**ので、起動時のクラッシュの有無も未確認
 - Phase 1: 完了し main にマージ済み。完了条件9つを実機で確認した(2026-11-14〜15、人と対話で)
   - 新規モジュール `tailnet/`: `TailnetController`(共通)、`TailnetManager`、`TailnetProxySelector`、`TailnetGateInterceptor`(起動待ちと利用中の印)、`TailnetProxyAuthenticator`、`NetworkStateReporter`、`TailnetSettings`。tsbridge は v0.1.0 の AAR を `tailnet/libs/` に置いた
   - 差し込み: GReader 用の OkHttp エンジン、画像ローダー、バックグラウンド同期の Worker(`SyncNetworkGate`)、FreshRSS アカウント画面の Tailscale の欄。変更した既存ファイルは FORK_CHANGES.md
@@ -51,14 +54,15 @@
 
 ## 次の作業
 
-1. アプリへの組み込み: androidApp に翻訳の組み立て(`TranslationDB` の `AndroidSqliteDriver`、`ModelStore`、`LlamaCppEngine`、`TranslationQueue`、`TitleTranslator`)を Koin モジュールとして足す。Phase 1 の `TailnetSetup` と同じ形
-2. タイムライン: shared には `translation/` への依存を足さず、Phase 1 の `SyncNetworkGate` と同じく小さなインターフェースを shared に置いて androidApp で実装する案。`FeedItem` に `translatedTitle` を足し、`FeedStateRepository` の読み込み(ページは 40 件)で埋め、`changes.batched(300)` を購読する
-3. 設定画面(モデルのダウンロードと削除、常体/敬体、フィード別のオン/オフ、ライセンスの表示)と、充電中のバッチの Worker(`ContentPrefetchWorker` に合わせる)
-4. 実機で PLAN の Phase 2 の完了条件を確かめる
+1. 実機に入れて起動を確かめる(`adb install -r`、crash バッファ、logcat のタグ `TitleTranslation`、`ModelStore`、`LlamaBridge`)
+2. PLAN の Phase 2 の完了条件を人と1つずつ確かめる。最初はモデルのダウンロードと中断後の再開(設定 → 読み方 → 翻訳)
+3. 確かめた結果で直す。あわせて、フィード別のオン/オフの画面を足す
+4. 表示時の翻訳は、いまは「一覧に読み込んだページ(40 件)」を対象にしている。画面に出ている行だけに絞る必要があるかは、実機で引っかかりを見てから決める
 
 ## 人への依頼
 
-- なし(次の実機確認までは不要)。release ビルドを使う場合は、署名用の `keystore.properties` を用意してください(リポジトリには入れない)。
+- 次に進むには実機が要ります。Fold8 を USB でつなぎ、`adb devices` に `device` と出る状態にしてください。Phase 2 の完了条件の確認を対話で進めます。
+- phase/2 は実機で確かめるまで main にマージしないでください(起動するかどうかも未確認です)。
 
 ## 人からの連絡
 
@@ -89,6 +93,11 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-15: タイムラインへの差し込みは、Phase 1 の `SyncNetworkGate` と同じ形にした。shared は `translation/` に依存せず、インターフェース `TimelineTitleTranslations` だけを持つ。実装は androidApp。変更の購読(300ms でまとめる)と翻訳の投入は androidApp 側のスコープで行い、`FeedStateRepository` には結果を渡すだけにした。
+- 2026-11-15: 表示時の翻訳の対象は「一覧に読み込んだページ」とした(1ページ 40 件、0.8B で約 8 秒)。PLAN の「画面に出ている未翻訳のタイトルだけ」より広い。行ごとの可視判定は上流の UI への変更が増えるため、実機で必要と分かってから入れる。
+- 2026-11-15: バッチの対象は、タイムラインの未読の新しい順 200 件。フィードの言語推定に使う「直近のタイトル」は、DB を引かず、タイムラインとバッチで見たタイトル(フィードごとに最大 30 件)から取る。5 件に満たない間は推定せず、文字種だけで判定する。
+- 2026-11-15: 翻訳の設定は、新しい画面を作らず「読み方」の設定画面の末尾に足した(上流の画面遷移への変更を避けるため)。文字列は翻訳リソースに入れず日本語を直接書いた(個人用ビルドのため。Tailscale の欄と同じ)。
+- 2026-11-15: androidApp に `ndkVersion` を足した。無いと `libllamabridge.so` のデバッグ情報が取り除かれず、APK に 54MB のまま入る(足した後は 6.5MB)。
 - 2026-11-15: ProGuard の確認(Phase 1 の残り)は別ブランチを作らず phase/2 で行った。設定の変更は不要だった。
 - 2026-11-15: llama.cpp の JNI は、`translation/` ではなく別の Android ライブラリ `llama/` に置いた。KMP の Android ライブラリのプラグインが CMake(externalNativeBuild)を扱えないため。
 - 2026-11-15: キャッシュの `model_rev` は、インストール済みファイルの実測ハッシュではなく、選んだモデルの `ModelSpec.sha256` を使う。ダウンロード時にこの値と照合しているので同じ値になり、モデルを消した後でもキャッシュ済みの訳題を表示できる。

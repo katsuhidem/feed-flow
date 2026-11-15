@@ -11,6 +11,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import com.prof18.feedflow.android.tailnet.TailnetSetup
+import com.prof18.feedflow.android.translation.TranslationSetup
 import com.prof18.feedflow.android.audio.AndroidAudioPlayer
 import com.prof18.feedflow.android.audio.AndroidSpeechAudioGenerator
 import com.prof18.feedflow.android.audio.SpeechAudioGenerating
@@ -68,6 +69,9 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
     // fork: embedded Tailscale node (Phase 1)
     private lateinit var tailnet: TailnetSetup
 
+    // fork: on-device translation (Phase 2)
+    private lateinit var translation: TranslationSetup
+
     override fun onCreate() {
         super.onCreate()
 
@@ -103,6 +107,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
         }
 
         tailnet = TailnetSetup(this)
+        translation = TranslationSetup(this)
 
         initKoin(
             appConfig = appConfig,
@@ -113,6 +118,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
             crashReportingLogWriter = CrashlyticsHelper.crashReportingLogWriter(),
             modules = listOf(
                 tailnet.koinModule,
+                translation.koinModule,
                 module {
                     single<Context> { this@FeedFlowApp }
                     single<WebViewProfiles> { AndroidWebViewProfiles(this@FeedFlowApp) }
@@ -180,6 +186,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
         )
 
         tailnet.install()
+        translation.install()
 
         feedDownloadWorkerEnqueuer.enqueueWork()
 
