@@ -129,6 +129,7 @@ class ModelStore(
                 }
                 if (!part.renameTo(modelFile(spec))) throw IOException("could not move the model into place")
                 markerFile(spec).writeText(actual.lowercase())
+                log.i { "download ${spec.id}: verified and installed" }
                 state.value = ModelState.Installed
                 true
             } catch (e: CancellationException) {
@@ -166,6 +167,7 @@ class ModelStore(
             .apply { if (have > 0) header("Range", "bytes=$have-") }
             .build()
         client.newCall(request).execute().use { response ->
+            val onDisk = have
             when {
                 response.code == HTTP_PARTIAL && have > 0 -> Unit
                 response.code == HTTP_OK -> {
@@ -174,6 +176,7 @@ class ModelStore(
                 }
                 else -> throw IOException("unexpected HTTP ${response.code}")
             }
+            log.i { "download ${spec.id}: on_disk=$onDisk http=${response.code} continue_from=$have" }
             state.value = ModelState.Downloading(have, spec.sizeBytes)
             RandomAccessFile(part, "rw").use { out ->
                 out.setLength(have)

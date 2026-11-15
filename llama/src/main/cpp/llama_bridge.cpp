@@ -50,7 +50,8 @@ bool cancelled() { return g_cancelled_id.load() == g_current_id.load(); }
 bool abort_cb(void *) { return cancelled(); }
 
 void log_cb(ggml_log_level level, const char *text, void *) {
-    if (level >= GGML_LOG_LEVEL_ERROR) __android_log_print(ANDROID_LOG_ERROR, "llama", "%s", text);
+    // Errors only. GGML_LOG_LEVEL_CONT (progress dots) is numerically above ERROR, so compare for equality.
+    if (level == GGML_LOG_LEVEL_ERROR) __android_log_print(ANDROID_LOG_ERROR, "llama", "%s", text);
 }
 
 std::vector<llama_token> tokenize(const std::string &text) {
