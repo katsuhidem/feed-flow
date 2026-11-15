@@ -24,8 +24,10 @@ kotlin {
         }
         androidMain {
             dependencies {
+                implementation(project(":llama"))
                 implementation(libs.sqldelight.android.driver)
                 implementation(libs.touchlab.kermit)
+                implementation("com.squareup.okhttp3:okhttp:5.5.1")
             }
         }
         jvmTest {

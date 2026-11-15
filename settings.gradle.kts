@@ -51,6 +51,7 @@ include("feedSync:test-utils")
 include(":tailnet")
 // fork: on-device translation (Phase 2)
 include(":translation")
+include(":llama")
 
 // Uncomment to use a local Klead checkout instead of the Maven Central dependency.
 // val kleadPath = providers.gradleProperty("feedflow.kleadPath")
