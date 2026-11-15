@@ -49,6 +49,8 @@ include("feedSync:networkcore")
 include("feedSync:test-utils")
 // fork: Tailscale integration (Phase 1)
 include(":tailnet")
+// fork: on-device translation (Phase 2)
+include(":translation")
 
 // Uncomment to use a local Klead checkout instead of the Maven Central dependency.
 // val kleadPath = providers.gradleProperty("feedflow.kleadPath")

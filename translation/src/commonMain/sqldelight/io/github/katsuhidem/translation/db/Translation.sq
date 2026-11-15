@@ -1,0 +1,105 @@
+-- Translations that finished normally. The key holds everything that
+-- changes the result, so a changed source or setting never returns an old text.
+CREATE TABLE translation_cache (
+  url_hash     TEXT NOT NULL,
+  field        TEXT NOT NULL,   -- 'title' / 'subtitle' / 'block'
+  source_hash  TEXT NOT NULL,
+  context_hash TEXT NOT NULL,
+  config_hash  TEXT NOT NULL,
+  model_rev    TEXT NOT NULL,
+  text         TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  PRIMARY KEY (url_hash, field, source_hash, context_hash, config_hash, model_rev)
+);
+
+-- Translations that failed for a reason that will repeat (not transient errors).
+CREATE TABLE translation_failure (
+  url_hash     TEXT NOT NULL,
+  field        TEXT NOT NULL,
+  source_hash  TEXT NOT NULL,
+  context_hash TEXT NOT NULL,
+  config_hash  TEXT NOT NULL,
+  model_rev    TEXT NOT NULL,
+  reason       TEXT NOT NULL,   -- 'over_budget' / 'truncated' / 'code_check'
+  failed_at    INTEGER NOT NULL,
+  PRIMARY KEY (url_hash, field, source_hash, context_hash, config_hash, model_rev)
+);
+
+-- Per-feed settings and the estimated language, kept out of the upstream feed table.
+CREATE TABLE feed_translation_meta (
+  feed_id        TEXT NOT NULL PRIMARY KEY,
+  mode           TEXT NOT NULL DEFAULT 'auto',   -- 'auto' / 'on' / 'off'
+  estimated_lang TEXT,                           -- 'ja' / 'other' / NULL (not decided yet)
+  updated_at     INTEGER NOT NULL
+);
+
+CREATE INDEX translation_cache_created ON translation_cache(created_at);
+CREATE INDEX translation_failure_failed ON translation_failure(failed_at);
+
+-- The caller matches the rest of the key in memory: the config hash holds the
+-- source language, which can differ between the articles of one query.
+selectCache:
+SELECT * FROM translation_cache
+WHERE url_hash IN ? AND field = ? AND model_rev = ?;
+
+selectFailures:
+SELECT * FROM translation_failure
+WHERE url_hash IN ? AND field = ? AND model_rev = ?;
+
+insertCache:
+INSERT OR REPLACE INTO translation_cache
+  (url_hash, field, source_hash, context_hash, config_hash, model_rev, text, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+insertFailure:
+INSERT OR REPLACE INTO translation_failure
+  (url_hash, field, source_hash, context_hash, config_hash, model_rev, reason, failed_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteFailure:
+DELETE FROM translation_failure
+WHERE url_hash = ? AND field = ? AND source_hash = ? AND context_hash = ? AND config_hash = ? AND model_rev = ?;
+
+countCache:
+SELECT count(*) FROM translation_cache;
+
+countFailures:
+SELECT count(*) FROM translation_failure;
+
+deleteCacheOlderThan:
+DELETE FROM translation_cache WHERE created_at < ?;
+
+deleteFailuresOlderThan:
+DELETE FROM translation_failure WHERE failed_at < ?;
+
+deleteOldestCache:
+DELETE FROM translation_cache WHERE rowid IN (
+  SELECT rowid FROM translation_cache ORDER BY created_at ASC LIMIT ?
+);
+
+deleteOldestFailures:
+DELETE FROM translation_failure WHERE rowid IN (
+  SELECT rowid FROM translation_failure ORDER BY failed_at ASC LIMIT ?
+);
+
+deleteAllCache:
+DELETE FROM translation_cache;
+
+deleteAllFailures:
+DELETE FROM translation_failure;
+
+selectFeedMeta:
+SELECT * FROM feed_translation_meta WHERE feed_id IN ?;
+
+-- No UPSERT: Android API 26 ships SQLite 3.18. The cache runs these in one transaction.
+insertFeedMetaIfAbsent:
+INSERT OR IGNORE INTO feed_translation_meta (feed_id, mode, estimated_lang, updated_at)
+VALUES (?, 'auto', NULL, ?);
+
+updateFeedMode:
+UPDATE feed_translation_meta SET mode = ?, updated_at = ? WHERE feed_id = ?;
+
+-- The estimate is written once and never replaced: re-estimating could change cache keys.
+updateFeedLangIfNull:
+UPDATE feed_translation_meta SET estimated_lang = ?, updated_at = ?
+WHERE feed_id = ? AND estimated_lang IS NULL;
