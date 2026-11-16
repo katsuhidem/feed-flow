@@ -597,6 +597,7 @@ class MainActivity : BaseThemeActivity() {
                     }
 
                     EditScreen(
+                        feedId = feedSource.id,
                         viewModel = viewModel,
                         navigateBack = navigateBack,
                     )

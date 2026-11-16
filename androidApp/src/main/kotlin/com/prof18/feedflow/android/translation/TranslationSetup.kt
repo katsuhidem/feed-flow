@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.prof18.feedflow.shared.domain.feed.TimelineTitleTranslations
+import io.github.katsuhidem.translation.FeedTranslationMode
 import io.github.katsuhidem.translation.LlamaCppEngine
 import io.github.katsuhidem.translation.ModelCatalog
 import io.github.katsuhidem.translation.TitleTranslator
@@ -104,6 +105,18 @@ class TranslationSetup(private val app: Application) {
     fun deleteModel() {
         cancelDownload()
         scope.launch { modelStore.delete(titleModel) }
+    }
+
+    suspend fun feedMode(feedId: String): FeedTranslationMode =
+        cache.feedMeta(listOf(feedId))[feedId]?.mode ?: FeedTranslationMode.AUTO
+
+    /** Stores the per-feed setting and re-reads the list, so titles appear or disappear at once. */
+    fun setFeedMode(feedId: String, mode: FeedTranslationMode) {
+        scope.launch {
+            cache.setFeedMode(feedId, mode)
+            timeline.refreshAll()
+            scheduleBatch()
+        }
     }
 
     fun recordTitles(items: Collection<io.github.katsuhidem.translation.TitleItem>) = titles.record(items)

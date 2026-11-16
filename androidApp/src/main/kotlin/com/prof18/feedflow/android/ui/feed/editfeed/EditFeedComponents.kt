@@ -72,6 +72,8 @@ fun EditFeedContent(
     youTubeOptions: YouTubeOptionsState = YouTubeOptionsState(),
     onHideShortsToggled: (Boolean) -> Unit = {},
     recoveryAction: @Composable () -> Unit = {},
+    // fork (Phase 2): per-feed translation setting
+    extraSettings: @Composable () -> Unit = {},
 ) {
     if (showDeleteDialog) {
         var deleteInProgressState by remember(showDeleteDialog) { mutableStateOf(false) }
@@ -228,6 +230,11 @@ fun EditFeedContent(
                     )
                 }
             }
+        }
+
+        // fork (Phase 2): per-feed translation setting
+        item {
+            extraSettings()
         }
 
         item {

@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.editfeed
 
+import com.prof18.feedflow.android.translation.FeedTranslationModeRow
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,6 +42,8 @@ import kotlinx.coroutines.launch
 internal fun EditScreen(
     viewModel: EditFeedViewModel,
     modifier: Modifier = Modifier,
+    // fork (Phase 2): id of the feed, for its translation setting
+    feedId: String? = null,
     navigateBack: () -> Unit,
 ) {
     val feedUrl by viewModel.feedUrlState.collectAsStateWithLifecycle()
@@ -185,6 +188,7 @@ internal fun EditScreen(
             },
             showNotificationToggle = showNotificationToggle,
             youTubeOptions = youTubeOptions,
+            extraSettings = { feedId?.let { FeedTranslationModeRow(feedId = it) } },
             onHideShortsToggled = viewModel::updateHideShortsStatus,
             onNotificationToggleChanged = { isNotificationEnabled ->
                 viewModel.updateIsNotificationEnabled(isNotificationEnabled)
