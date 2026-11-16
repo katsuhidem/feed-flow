@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.prof18.feedflow.shared.domain.feed.TimelineTitleTranslations
+import io.github.katsuhidem.translation.ArticleTranslator
 import io.github.katsuhidem.translation.FeedTranslationMode
 import io.github.katsuhidem.translation.LlamaCppEngine
 import io.github.katsuhidem.translation.ModelCatalog
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -55,6 +57,18 @@ class TranslationSetup(private val app: Application) {
         )
     }
 
+    /** Article text uses the same model and queue as titles. */
+    val articleTranslator by lazy {
+        ArticleTranslator(
+            cache = cache,
+            queue = queue,
+            config = { prefs.config() },
+            modelRev = { titleModel.sha256 },
+            canTranslate = { modelStore.isInstalled(titleModel) },
+            nowMillis = System::currentTimeMillis,
+        )
+    }
+
     val timeline by lazy {
         TimelineTitleTranslationsImpl(
             translator = titleTranslator,
@@ -69,6 +83,7 @@ class TranslationSetup(private val app: Application) {
     val koinModule: Module = module {
         single { this@TranslationSetup }
         single<TimelineTitleTranslations> { timeline }
+        viewModel { ArticleTranslationViewModel(this@TranslationSetup) }
     }
 
     /** Call after Koin has started. */

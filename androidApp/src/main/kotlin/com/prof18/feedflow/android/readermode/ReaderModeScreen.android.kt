@@ -1,5 +1,7 @@
 package com.prof18.feedflow.android.readermode
 
+import com.prof18.feedflow.android.translation.ArticleTranslationViewModel
+import com.prof18.feedflow.android.translation.ArticleTranslationButton
 import android.webkit.CookieManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -140,6 +142,9 @@ internal fun ReaderModeScreen(
     onOpenAudioEpisode: ((AudioEpisode) -> Unit)? = null,
 ) {
     val readerModeViewModel = koinViewModel<ReaderModeViewModel>()
+    // fork (Phase 3): translation state lives in its own view model
+    val translationViewModel = koinViewModel<ArticleTranslationViewModel>()
+    val translationUi by translationViewModel.ui.collectAsStateWithLifecycle()
     val articleReportState by readerModeViewModel.articleReportState.collectAsStateWithLifecycle()
     val browserManager = koinInject<BrowserManager>()
     val audioPlayer = koinInject<AndroidAudioPlayer>()
@@ -180,6 +185,11 @@ internal fun ReaderModeScreen(
                     },
                     isDetailFullscreen = isDetailFullscreen,
                     onToggleDetailFullscreen = onToggleDetailFullscreen,
+                    actions = {
+                        if (readerModeState is ReaderModeState.Success && !showingFallbackWebsite) {
+                            ArticleTranslationButton(translationUi, translationViewModel::onButtonClick)
+                        }
+                    },
                 )
             },
 
@@ -334,6 +344,7 @@ internal fun ReaderModeScreen(
                             headlineFont = headlineFont,
                             bodyFont = bodyFont,
                             readerModeState = readerModeState,
+                            translation = translationViewModel,
                             openInBrowser = { url ->
                                 if (isValidUrl(url)) {
                                     browserManager.openUrlWithFavoriteBrowser(url, context)
@@ -626,6 +637,8 @@ private fun ReaderMode(
     onExpandToolbar: () -> Unit,
     onCollapseToolbar: () -> Unit,
     modifier: Modifier = Modifier,
+    // fork (Phase 3)
+    translation: ArticleTranslationViewModel? = null,
 ) {
     val bodyColor = MaterialTheme.colorScheme.onSurface.toArgb().toHexString().substring(2)
     val linkColor = MaterialTheme.colorScheme.primary.toArgb().toHexString().substring(2)
@@ -738,12 +751,38 @@ private fun ReaderMode(
                 override fun methodName(): String = "imageInterceptor"
             },
         )
+        // fork (Phase 3): the page reports its translation blocks here
+        jsBridge.register(
+            object : IJsMessageHandler {
+                override fun handle(
+                    message: JsMessage,
+                    navigator: WebViewNavigator?,
+                    callback: (String) -> Unit,
+                ) {
+                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                        translation?.onBlocks(message.params)
+                    }
+                }
+
+                override fun methodName(): String = "translationBlocks"
+            },
+        )
     }
 
     val state = rememberWebViewStateWithHTMLData(
         data = content,
         baseUrl = readerModeState.readerModeData.baseUrl,
     )
+
+    // fork (Phase 3): tell the translation which article the loaded page shows, and run its commands.
+    val pageLoaded = state.loadingState is LoadingState.Finished
+    val shownArticleId = readerModeData.id.id
+    LaunchedEffect(translation, pageLoaded, shownArticleId) {
+        if (pageLoaded) translation?.onPageReady(shownArticleId, readerModeData.title, readerModeData.languageTag)
+    }
+    LaunchedEffect(translation) {
+        translation?.jsCommands?.collect { script -> navigator.evaluateJavaScript(script) }
+    }
 
     SideEffect(isAudioPlaying, state.loadingState) {
         if (state.loadingState is LoadingState.Finished) {

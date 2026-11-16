@@ -1,5 +1,6 @@
 package com.prof18.feedflow.android.readermode
 
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,8 @@ internal fun ReaderModeToolbar(
     navigateBack: () -> Unit,
     isDetailFullscreen: Boolean = false,
     onToggleDetailFullscreen: (() -> Unit)? = null,
+    // fork (Phase 3): the translate button
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val backButtonColor = if (isSystemInDarkTheme()) {
         MaterialTheme.colorScheme.surfaceContainerHighest
@@ -71,6 +74,7 @@ internal fun ReaderModeToolbar(
                     )
                 }
             },
+            actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 scrolledContainerColor = Color.Transparent,
