@@ -23,6 +23,9 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/home/components/list/FeedItemCommon.kt` | 訳題があれば主に表示し、原題を下に小さく表示(`OriginalTitle`) | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreenContent.kt` | `footerContent` 引数を追加 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/feed/editfeed/EditFeedComponents.kt` | `EditFeedContent` に `extraSettings` 引数を追加 | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/editfeed/EditFeedScreen.android.kt` | `EditScreen` に `feedId` 引数を追加し、フィード別の翻訳設定を表示 | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/MainActivity.kt` | `EditScreen` に `feedId` を渡す | 2 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/utils/ImageLoader.kt` | `coilImageLoader` に `okHttpClient` 引数を追加し、`OkHttpNetworkFetcherFactory` で使う | 1 |

@@ -1,17 +1,17 @@
 # STATUS
 
-最終更新: 2026-11-16(エージェント。スクロールの対策を試したが効果なし。判定は人に依頼)
+最終更新: 2026-11-16(エージェント。Phase 2 の実装と実機確認が一通り済み、main へのマージを人に依頼)
 
 ## 現在地
 
-- フェーズ: Phase 2(作業中。ブランチ phase/2)。実機をつながずに進められる部分だけを実装した。**実機では一度も動かしていない**
+- フェーズ: Phase 2(ブランチ phase/2、main へのマージ待ち)。実装は一通り済み、完了条件8つのうち7つを実機で確認した。残る1つ(かなを含まない日本語タイトル)は単体テストでの確認のみ
   - 済: 新規モジュール `translation/`(KMP)。`PlamoPromptBuilder`、`TokenBudget`、`LanguageGate`、`TranslationPlanner`(キーを作る唯一の関数)、`TranslationCache`(専用の SQLDelight DB、失敗の記録、フィード別設定、300ms でまとめる変更通知)、`TranslationEngine`、`TranslationQueue`、`TitleTranslator`。JVM の単体テスト 73 件がすべて通る(`./gradlew :translation:jvmTest`)
   - 済: 新規モジュール `llama/`(Android ライブラリ)。submodule の llama.cpp を arm64、CPU、Release でビルドする JNI。`:llama:assembleDebug` が通り、`libllamabridge.so` ができる
   - 済: `translation/` の Android 側: `LlamaCppEngine`、`ModelStore`(Range での再開、SHA-256 検証、0.8B と 2B のカタログ)。`:translation:compileAndroidMain` が通る
   - 済(ビルドのみ): アプリへの組み込み。`androidApp/.../translation/` に `TranslationSetup`(組み立てと Koin)、`TimelineTitleTranslationsImpl`、`TitleTranslationWorker`(充電中のバッチ)、`TranslationPrefs`、`TranslationSettingsSection`(設定)。`assembleFdroidDebug` が通る(debug APK 74.9MB。`libllamabridge.so` 6.5MB)
   - 済(テストあり): タイムラインへの差し込み。shared に小さなインターフェース `TimelineTitleTranslations` を置き、`FeedStateRepository` が一覧を公開する前に訳題を埋め、保存の通知で差し替える。`FeedItem.translatedTitle` を追加。`:shared:jvmTest --tests '*FeedStateRepository*'` は 25 件(既存 21、追加 4)すべて通る
   - 済(ビルドのみ): 行の表示(訳題を主、原題を小さく副)。設定は「読み方」の設定画面の末尾(翻訳のオン/オフ、モデルのダウンロード・中断・削除、常体/敬体、ライセンスの表示)
-  - 未: フィード別のオン/オフの画面(保存先 `feed_translation_meta` と判定は実装済み。操作する UI がない)
+  - 済(実機で確認、2026-11-16): フィード別の設定。フィードの編集画面に「タイトルの翻訳」(自動/常に翻訳する/翻訳しない)。人が TechCrunch で「翻訳しない」→ 原題に戻る、「自動」→ 訳題が戻る、を確認。DB でも mode が保存され、推定言語(`other`)は保たれている
   - 実機での確認(2026-11-16、人と対話で。クラッシュなし):
     - 済: アプリ内からモデルをダウンロードでき、中断後に再開できる。126MB の時点でアプリを強制終了 → 開き直すと「ダウンロード: 125MB / 573MB」→ 続きから完了。別の回のログで `on_disk=200000000 http=206 continue_from=200000000`、検証後にインストール
     - 済: 英語フィードのタイトルに訳題が表示され、日本語フィードは翻訳されない。日本語フィード 20 件は訳 0 件(`estimated_lang=ja`)。英語は Android Developers' Blog 5 件、TechCrunch 10 件
@@ -83,14 +83,13 @@
 
 ## 次の作業
 
-1. スクロールの計測結果について、人の判定を受ける
-2. フィード別のオン/オフの画面を足す
-3. 完了条件がそろったら、phase/2 の main へのマージを人に依頼する
+1. phase/2 が main にマージされたら、Phase 3(本文の対訳表示)のブランチを切って始める
+2. Phase 3 に持ち越す点: 用語の揺れ(同じ語が記事ごとに別の訳になる)、製品名やコードの保護、表示時の翻訳の対象を「読み込んだページ」から「画面に出ている行」に絞るかどうか
 
 ## 人への依頼
 
-- スクロールの計測結果(「現在地」の表)を見て、完了条件「バッチ翻訳が動いている間も、スクロールが引っかからない」を合格とするかを決めてください。試した対策(優先度、スレッド数)は効果がありませんでした。
-- phase/2 は、残りの確認が済むまで main にマージしないでください。
+- phase/2 を確認し、main へマージしてください。
+- 完了条件「日本語フィードの、かなを含まないタイトルが翻訳されない」は、実機に該当する記事が無く、単体テストでの確認にとどまっています。これで完了としてよいか決めてください。該当するタイトルが日本語フィードに現れたら、訳されていないことを見てもらえると確実です。
 
 ## 人からの連絡
 
@@ -113,6 +112,7 @@
 
 - 2026-11-14: `.github/workflows` と `renovate.json` は両方削除する。
 - 2026-11-16: Fold8 をつないだ。FreshRSS に日本語のフィードと中国語のフィードを1件ずつ追加した。中国語のタイトルは見ている間に訳題へ切り替わった。アプリを開いた時点で英語の訳題はすでに出ていた。文体の切り替えは速くてよく分からなかった。
+- 2026-11-16: フィード別の設定を実機で試し、期待どおりだった。
 - 2026-11-16: スクロールの完了条件は、計測結果のとおりで合格にする。
 - 2026-11-16: スクロールの対策を試す。
 - 2026-11-16: スクロールの引っかかりは自動スクロールで計測してよい。「スクロールして既読としてマーク」は人がオフにした。
@@ -126,6 +126,7 @@
 - 2026-11-14: .githooks/pre-commit の auth key の検出を、引き継ぎ文書の `tskey-[A-Za-z0-9]+` から `tskey-[a-z]+-[A-Za-z0-9]+` に変えた。元の式は docs/HUMAN_TASKS.md の説明文(`tskey-auth-…` と `'tskey-auth'`)に一致し、引き継ぎのコミット自体が止まるため。引き継ぎの確認に使う試験用の文字列と、実際のキーの形には引き続き一致する。
 - 2026-11-14: 人の選択により、applicationId を `io.github.katsuhidem.feedflow`、アプリ名を `Tailfeed`、アイコンを元のアイコンの色替えにした。`namespace` と Kotlin のパッケージ名は変えていない。変更した既存ファイルは FORK_CHANGES.md にある。
 - 2026-11-14: 人の指示により、FreshRSSのURLを、Mac miniのマシン名からサービス名(`svc:freshrss`)に変えた。docs/PLAN.md(前提と方針、FreshRSSの到達URL、MacでのFreshRSS構築、0bのtailnet側の準備、確かめる点、参照)と docs/HUMAN_TASKS.md(控えの表、3節、5節、6節、7節)を合わせて更新した。0bで確かめる点に「tsnetからサービスの仮想IPに届くか」を足した。
+- 2026-11-16: フィード別の設定は、フィードの編集画面に置いた。選んだ時点で保存し、画面の保存ボタンとは連動させない(保存ボタンは上流の ViewModel の処理で、そこに翻訳の設定を混ぜないため)。
 - 2026-11-16: 推論は `Dispatchers.IO` の共有スレッドではなく、専用の1本のスレッド(`llama-worker`)で動かすようにした。優先度を設定できるようにするためで、既定の優先度は 0(変更なし)。スレッド数と優先度は `translation` の設定ファイルの `debug_threads` と `debug_thread_priority` で上書きできる(画面はない)。計測の後、端末の設定は「有効、常体」だけに戻した。
 - 2026-11-16: スクロールの計測のため、端末上のアプリの設定ファイルとキャッシュを adb(run-as)で直接書き換えた。文体を敬体に変えて訳し直しを起こし、繰り返しのために敬体の訳のキャッシュ行を消した。計測の後、文体は人が選んだ常体に戻した。敬体の訳 9 件はキャッシュに残っている(表示には使われない)。
 - 2026-11-15: タイムラインへの差し込みは、Phase 1 の `SyncNetworkGate` と同じ形にした。shared は `translation/` に依存せず、インターフェース `TimelineTitleTranslations` だけを持つ。実装は androidApp。変更の購読(300ms でまとめる)と翻訳の投入は androidApp 側のスコープで行い、`FeedStateRepository` には結果を渡すだけにした。
