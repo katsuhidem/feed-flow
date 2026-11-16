@@ -670,6 +670,7 @@ private fun ReaderMode(
     val latestOpenImage by rememberUpdatedState(onImageClick)
     val latestExpand by rememberUpdatedState(onExpandToolbar)
     val latestCollapse by rememberUpdatedState(onCollapseToolbar)
+    val latestArticle by rememberUpdatedState(readerModeState.readerModeData)
 
     @Suppress("MagicNumber")
     val spacerHeightDp = (contentPadding.calculateTopPadding().value - 40f).toInt().coerceAtLeast(0)
@@ -767,6 +768,26 @@ private fun ReaderMode(
                 override fun methodName(): String = "translationBlocks"
             },
         )
+        jsBridge.register(
+            object : IJsMessageHandler {
+                override fun handle(
+                    message: JsMessage,
+                    navigator: WebViewNavigator?,
+                    callback: (String) -> Unit,
+                ) {
+                    bridgeScope.launch(Dispatchers.Main.immediate) {
+                        translation?.onPageReady(
+                            latestArticle.id.id,
+                            latestArticle.title,
+                            latestArticle.languageTag,
+                            pageToken = message.params,
+                        )
+                    }
+                }
+
+                override fun methodName(): String = "translationPage"
+            },
+        )
     }
 
     val state = rememberWebViewStateWithHTMLData(
@@ -778,7 +799,10 @@ private fun ReaderMode(
     val pageLoaded = state.loadingState is LoadingState.Finished
     val shownArticleId = readerModeData.id.id
     LaunchedEffect(translation, pageLoaded, shownArticleId) {
-        if (pageLoaded) translation?.onPageReady(shownArticleId, readerModeData.title, readerModeData.languageTag)
+        // The page answers through the "translationPage" handler with a token for the loaded document.
+        if (pageLoaded && translation != null) {
+            navigator.evaluateJavaScript("window.feedflowTranslation && window.feedflowTranslation.ping();")
+        }
     }
     LaunchedEffect(translation) {
         translation?.jsCommands?.collect { script -> navigator.evaluateJavaScript(script) }

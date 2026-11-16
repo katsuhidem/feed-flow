@@ -36,6 +36,9 @@ window.feedflowTranslation = (function () {
   var INSIDE = { LI:1, DT:1, DD:1, TD:1, TH:1, CAPTION:1, SUMMARY:1, FIGCAPTION:1, BLOCKQUOTE:1 };
   var TR_CLASS = "__ff_tr";
 
+  // New for every load of the document. The app compares it to tell a real
+  // reload from a repeated "page finished" notification.
+  var pageToken = String(Date.now()) + "-" + String(Math.floor(Math.random() * 1e9));
   var session = null;
   var run = null;
   var anchors = {};   // block id -> { el, inside } or { last }
@@ -179,6 +182,13 @@ window.feedflowTranslation = (function () {
   }
 
   return {
+    // Reports which document this is.
+    ping: function () {
+      if (window.kmpJsBridge && window.kmpJsBridge.callNative) {
+        window.kmpJsBridge.callNative("translationPage", pageToken, {});
+      }
+      return pageToken;
+    },
     // Collects the blocks of the article and reports them to the app.
     collect: function (sessionId) {
       session = sessionId;

@@ -54,6 +54,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
 
     private val ids = AtomicLong(0)
     private var articleId: String? = null
+    private var pageToken: String? = null
     private var title: String? = null
     private var languageTag: String? = null
     private var sessionId: String? = null
@@ -64,12 +65,20 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
     private var active = false
 
     /**
-     * The reader page finished loading. A new article resets everything; a
-     * reload of the same article (theme or inset change) lost the inserted
-     * translations, so they are put back from the cache.
+     * The reader page reported itself after loading. A new article resets
+     * everything; a reload of the same article (theme or inset change) lost
+     * the inserted translations, so they are put back from the cache.
+     *
+     * @param pageToken identifies the loaded document. "Page finished" is
+     *   also signalled without a reload (late images, for example); the same
+     *   token for the same article means nothing changed, and a running
+     *   translation must not be restarted.
      */
-    fun onPageReady(articleId: String, title: String?, languageTag: String?) {
+    fun onPageReady(articleId: String, title: String?, languageTag: String?, pageToken: String) {
         val sameArticle = articleId == this.articleId
+        if (sameArticle && pageToken == this.pageToken) return
+        log.d { "page ready: sameArticle=$sameArticle active=$active" }
+        this.pageToken = pageToken
         stopRun()
         this.articleId = articleId
         this.title = title
