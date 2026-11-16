@@ -93,6 +93,30 @@ class ArticleTranslatorTest {
     }
 
     @Test
+    fun inAJapaneseArticleNamesLabelsAndKanaLessHeadingsStayAsTheyAre() = runTest {
+        val f = Fixture(this)
+        val quote = "Simple things should be simple, complex things should be possible."
+        val session = f.open(
+            ArticleBlock(1, "nrs"),
+            ArticleBlock(2, "大量のプルリクエストをまとめて処理する方法を紹介します。"),
+            ArticleBlock(3, "同時実行数"),
+            ArticleBlock(4, "同時に実行する数は設定で変えられます。"),
+            ArticleBlock(5, "CodeRabbit対応"),
+            ArticleBlock(6, "レビューの指摘にも自動で対応します。"),
+            ArticleBlock(7, quote),
+            ArticleBlock(8, "この言葉のとおりに作りました。"),
+            ArticleBlock(9, "まとめると、手作業が減ります。"),
+            ArticleBlock(10, "Discussion"),
+        )
+        val updates = Updates()
+        val summary = session.run(retryFailed = false, onUpdate = updates.sink)
+
+        assertEquals(mapOf(7 to quote.uppercase()), updates.done(), "only the quoted English sentence is translated")
+        assertEquals(listOf(quote), f.engine.translated)
+        assertEquals(9, summary.skipped)
+    }
+
+    @Test
     fun plainBlocksShowTextWhileGeneratedAndCodeBlocksOnlyWhenVerified() = runTest {
         val f = Fixture(this)
         val session = f.open(ArticleBlock(1, "plain paragraph"), codeBlock)

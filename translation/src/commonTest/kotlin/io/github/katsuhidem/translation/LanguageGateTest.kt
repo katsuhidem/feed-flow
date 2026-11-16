@@ -112,4 +112,54 @@ class LanguageGateTest {
         // Titles without letters do not count toward the minimum.
         assertNull(LanguageGate.estimateFeedLanguage(listOf("お知らせ", "障害情報", "更新", "告知", "1.0", "2.0")))
     }
+
+    @Test
+    fun blocksOfAForeignArticleAreTranslatedUnlessVeryShortOrJapanese() {
+        val translate = GateDecision.Translate(null)
+        assertEquals(translate, LanguageGate.decideBlock("Bug fixes", FeedLanguage.OTHER))
+        assertEquals(translate, LanguageGate.decideBlock("Discussion", null))
+        assertEquals(translate, LanguageGate.decideBlock("前言", FeedLanguage.OTHER))
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("nrs", FeedLanguage.OTHER))
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("FAQ", null))
+        assertEquals(skip(SkipReason.UNDETERMINED), LanguageGate.decideBlock("1.", FeedLanguage.OTHER))
+        assertEquals(skip(SkipReason.JAPANESE_TEXT), LanguageGate.decideBlock("これは日本語です", FeedLanguage.OTHER))
+    }
+
+    @Test
+    fun codeCountsTowardsTheSizeOfABlock() {
+        // "Use `x`": the prose alone is very short, but with its code it is a sentence.
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("Use  ", FeedLanguage.OTHER))
+        assertEquals(GateDecision.Translate(null), LanguageGate.decideBlock("Use  ", FeedLanguage.OTHER, codeSpans = 1))
+    }
+
+    @Test
+    fun inAJapaneseArticleOnlyForeignSentencesAreTranslated() {
+        val ja = FeedLanguage.JAPANESE
+        // Japanese without kana.
+        assertEquals(skip(SkipReason.JAPANESE_TEXT), LanguageGate.decideBlock("同時実行数", ja))
+        assertEquals(skip(SkipReason.JAPANESE_TEXT), LanguageGate.decideBlock("CodeRabbit対応", ja))
+        // Names and labels.
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("nrs", ja))
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("Discussion", ja))
+        assertEquals(skip(SkipReason.TOO_SHORT), LanguageGate.decideBlock("Table of Contents", ja))
+        // A quoted English sentence.
+        assertEquals(
+            GateDecision.Translate(null),
+            LanguageGate.decideBlock("Simple things should be simple, complex things should be possible.", ja),
+        )
+    }
+
+    @Test
+    fun articleLanguageIsWeighedByTheSizeOfItsBlocks() {
+        val japanese = "大量のプルリクエストをまとめて処理する方法を紹介します。同時に実行する数は設定で変えられます。"
+        val english = "This paragraph is written in English and is long enough to count for something in the estimate."
+        // Many short lines in Latin letters do not outweigh the Japanese paragraphs.
+        val labels = listOf("nrs", "Discussion", "takt merge", "GitHub", "CodeRabbit", "README", "npm", "CLI")
+        assertEquals(FeedLanguage.JAPANESE, LanguageGate.estimateArticleLanguage(labels + List(3) { japanese }))
+        // An English article that quotes one Japanese sentence.
+        assertEquals(FeedLanguage.OTHER, LanguageGate.estimateArticleLanguage(List(6) { english } + "これは日本語の例文です。"))
+        // Chinese text has no kana.
+        assertEquals(FeedLanguage.OTHER, LanguageGate.estimateArticleLanguage(List(20) { "北京地铁新线路开通，多地迎来强降雨。" }))
+        assertEquals(null, LanguageGate.estimateArticleLanguage(listOf("Short note", "お知らせ")))
+    }
 }

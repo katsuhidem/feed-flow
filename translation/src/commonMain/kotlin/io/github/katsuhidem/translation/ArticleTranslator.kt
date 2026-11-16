@@ -256,16 +256,21 @@ class ArticleSession internal constructor(
     private fun plan(config: TranslationConfig, modelRev: String): List<Planned> {
         val out = mutableListOf<Planned>()
         // A language tag is only a hint for the source language; whether a block
-        // is Japanese is judged from its own text, since the user asked for this article.
+        // is translated is judged from its own text and from the article as a whole
+        // (LanguageGate.decideBlock), since the user asked for this article.
         val hint = LanguageGate.modelLanguageCode(languageTag).takeUnless { it == "ja" }
+        val prepared = blocks.map { block ->
+            val protected = CodeProtection.protect(block.text, block.codes)
+            // Judge on the prose alone: code would count as letters.
+            protected to protected.placeholders.fold(protected.text) { acc, (token, _) -> acc.replace(token, " ") }
+        }
+        val articleLanguage = LanguageGate.estimateArticleLanguage(prepared.map { it.second })
         var previous: ArticleBlock? = null
-        for (block in blocks) {
+        for ((index, block) in blocks.withIndex()) {
             val context = contextFor(previous)
             previous = block
-            val protected = CodeProtection.protect(block.text, block.codes)
-            // Judge the language on the prose alone: code would count as letters.
-            val prose = protected.placeholders.fold(protected.text) { acc, (token, _) -> acc.replace(token, " ") }
-            if (LanguageGate.decide(prose) is GateDecision.Skip) continue
+            val (protected, prose) = prepared[index]
+            if (LanguageGate.decideBlock(prose, articleLanguage, protected.placeholders.size) is GateDecision.Skip) continue
 
             val pieces = TokenBudget.split(protected.text, CodeProtection::placeholderRanges).map { pieceText ->
                 val tokens = CodeProtection.tokensIn(pieceText, protected.placeholders)

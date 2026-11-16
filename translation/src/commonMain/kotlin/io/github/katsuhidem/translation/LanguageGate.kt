@@ -23,7 +23,7 @@ enum class FeedLanguage(val dbValue: String) {
     }
 }
 
-enum class SkipReason { EMPTY, FEED_OFF, JAPANESE_FEED, JAPANESE_TAG, JAPANESE_TEXT, UNDETERMINED }
+enum class SkipReason { EMPTY, FEED_OFF, JAPANESE_FEED, JAPANESE_TAG, JAPANESE_TEXT, UNDETERMINED, TOO_SHORT }
 
 sealed interface GateDecision {
     /** Translate; [sourceLang] is a model language code, or null to let the model guess. */
@@ -47,6 +47,19 @@ object LanguageGate {
     private const val MIN_TITLES_FOR_ESTIMATE = 5
     private const val JAPANESE_FEED_RATIO = 0.6
 
+    /** Blocks below this size are "very short" (a name, "FAQ", a single Han character) and are left alone. */
+    private const val MIN_BLOCK_UNITS = 4
+
+    /** In a Japanese article only foreign text of about a sentence or more is translated, not labels and names. */
+    private const val MIN_FOREIGN_UNITS_IN_JAPANESE_ARTICLE = 30
+
+    /** What one inline code span adds to the size of a block. */
+    private const val CODE_SPAN_UNITS = 4
+
+    /** An article with less text than this is not judged as a whole. */
+    private const val MIN_ARTICLE_UNITS = 200
+    private const val JAPANESE_ARTICLE_RATIO = 0.6
+
     fun decide(
         text: String?,
         feedMode: FeedTranslationMode = FeedTranslationMode.AUTO,
@@ -69,6 +82,60 @@ object LanguageGate {
     }
 
     /**
+     * Decides whether one block of an article's text is translated.
+     *
+     * The user asked for this article, so neither the feed nor the language
+     * tag is looked at; the block's own text decides, together with the
+     * language of the article as a whole ([articleLanguage], from
+     * [estimateArticleLanguage]):
+     *
+     * - A block with kana is Japanese.
+     * - In a Japanese article, a block with Han characters but no kana
+     *   (a heading such as "同時実行数") is Japanese too, and other text is
+     *   translated only when it is about a sentence long, so author names
+     *   and labels such as "Discussion" stay as they are.
+     * - Elsewhere only very short blocks are left alone.
+     *
+     * Sizes are counted in [TokenBudget.units] over letters and digits, so
+     * the result does not depend on a model.
+     *
+     * @param prose the block's text with inline code taken out
+     * @param codeSpans number of inline code spans taken out
+     */
+    fun decideBlock(prose: String, articleLanguage: FeedLanguage?, codeSpans: Int = 0): GateDecision {
+        if (prose.count { it.isLetter() } < MIN_LETTERS) return GateDecision.Skip(SkipReason.UNDETERMINED)
+        if (containsKana(prose)) return GateDecision.Skip(SkipReason.JAPANESE_TEXT)
+        val units = TokenBudget.units(prose.filter { it.isLetterOrDigit() }) + codeSpans * CODE_SPAN_UNITS
+        if (articleLanguage == FeedLanguage.JAPANESE) {
+            if (containsHan(prose)) return GateDecision.Skip(SkipReason.JAPANESE_TEXT)
+            if (units < MIN_FOREIGN_UNITS_IN_JAPANESE_ARTICLE) return GateDecision.Skip(SkipReason.TOO_SHORT)
+        } else if (units < MIN_BLOCK_UNITS) {
+            return GateDecision.Skip(SkipReason.TOO_SHORT)
+        }
+        return GateDecision.Translate(sourceLang = null)
+    }
+
+    /**
+     * Estimates whether an article is written in Japanese, from the text of
+     * its blocks (inline code taken out). Blocks are weighed by their size,
+     * not counted: a Japanese article may have many short lines in Latin
+     * letters (names, labels, list items of commands) next to a few long
+     * Japanese paragraphs. Returns null for an article with too little text.
+     */
+    fun estimateArticleLanguage(blocks: List<String>): FeedLanguage? {
+        var total = 0
+        var withKana = 0
+        for (block in blocks) {
+            if (block.count { it.isLetter() } < MIN_LETTERS) continue
+            val units = TokenBudget.units(block.filter { it.isLetterOrDigit() })
+            total += units
+            if (containsKana(block)) withKana += units
+        }
+        if (total < MIN_ARTICLE_UNITS) return null
+        return if (withKana >= total * JAPANESE_ARTICLE_RATIO) FeedLanguage.JAPANESE else FeedLanguage.OTHER
+    }
+
+    /**
      * Estimates a feed's language from its recent titles. Returns null while
      * there are too few titles to decide; the caller stores the first
      * non-null result and does not ask again.
@@ -81,6 +148,14 @@ object LanguageGate {
     }
 
     fun containsKana(text: String): Boolean = text.any { isKana(it) }
+
+    fun containsHan(text: String): Boolean = text.any { isHan(it) }
+
+    private fun isHan(c: Char): Boolean = when (c.code) {
+        // CJK unified ideographs, extension A, compatibility ideographs, and the iteration mark.
+        in 0x4E00..0x9FFF, in 0x3400..0x4DBF, in 0xF900..0xFAFF, 0x3005 -> true
+        else -> false
+    }
 
     private fun isKana(c: Char): Boolean = when (c.code) {
         // Hiragana, except the combining marks and unused code points at the edges.
