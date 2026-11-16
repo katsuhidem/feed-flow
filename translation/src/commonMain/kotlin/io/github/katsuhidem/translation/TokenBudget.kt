@@ -82,12 +82,17 @@ object TokenBudget {
      * Splits [text] into blocks of at most [MAX_BLOCK_UNITS]. Cut points are
      * tried in this order: the last sentence end within the limit, the last
      * whitespace, then the limit itself, so any text can be split.
+     *
+     * @param atomic finds ranges that must stay whole (code placeholders); a
+     *   cut that would land inside one moves to its start, or to its end when
+     *   the range opens the block
      */
-    fun split(text: String): List<String> {
+    fun split(text: String, atomic: (String) -> List<IntRange> = { emptyList() }): List<String> {
         val t = text.trim()
         if (t.isEmpty()) return emptyList()
         if (units(t) <= MAX_BLOCK_UNITS) return listOf(t)
 
+        val whole = atomic(t)
         val out = mutableListOf<String>()
         var start = 0
         while (start < t.length) {
@@ -111,6 +116,9 @@ object TokenBudget {
                 else -> i
             }
             if (cut < t.length && cut > start + 1 && t[cut - 1].isHighSurrogate()) cut--
+            whole.firstOrNull { cut > it.first && cut <= it.last }?.let { range ->
+                cut = if (range.first > start) range.first else range.last + 1
+            }
             if (cut <= start) cut = minOf(t.length, start + 1) // always make progress
             val piece = t.substring(start, cut).trim()
             if (piece.isNotEmpty()) out += piece

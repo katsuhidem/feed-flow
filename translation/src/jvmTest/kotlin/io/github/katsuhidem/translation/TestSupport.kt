@@ -38,6 +38,7 @@ internal class FakeEngine : TranslationEngine {
     var unloadCount = 0
     var failLoad = false
     val translated = mutableListOf<String>()
+    val prompts = mutableListOf<String>()
     var maxTokensSeen = mutableListOf<Int>()
 
     /** When set, translate() waits for it before finishing; lets a test hold a job in "running". */
@@ -66,6 +67,7 @@ internal class FakeEngine : TranslationEngine {
         val source = prompt.substringAfter("<|plamo:tag|>input").substringAfter("<|plamo:msg|>")
             .substringBefore("<|plamo:tag|>output")
         maxTokensSeen += maxTokens
+        prompts += prompt
         started?.complete(Unit)
         emit(TranslationEvent.Delta(source.take(1).uppercase()))
         gate?.await()

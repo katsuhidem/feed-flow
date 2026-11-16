@@ -96,6 +96,30 @@ class TranslationCache(
         _changes.emit(setOf(key.urlHash))
     }
 
+    /**
+     * Stores the pieces of one block together: all of them or none. Used for
+     * article blocks, where a block is kept only when every piece succeeded.
+     */
+    suspend fun saveSuccessAll(entries: List<Pair<TranslationKey, String>>) {
+        if (entries.isEmpty()) return
+        withContext(dispatcher) {
+            db.transaction {
+                val now = nowMillis()
+                for ((key, text) in entries) {
+                    queries.insertCache(
+                        key.urlHash, key.field.dbValue, key.sourceHash, key.contextHash, key.configHash,
+                        key.modelRev, text, now,
+                    )
+                    queries.deleteFailure(
+                        key.urlHash, key.field.dbValue, key.sourceHash, key.contextHash, key.configHash,
+                        key.modelRev,
+                    )
+                }
+            }
+        }
+        _changes.emit(entries.mapTo(HashSet()) { it.first.urlHash })
+    }
+
     suspend fun saveFailure(key: TranslationKey, reason: FailureReason) {
         withContext(dispatcher) {
             queries.insertFailure(

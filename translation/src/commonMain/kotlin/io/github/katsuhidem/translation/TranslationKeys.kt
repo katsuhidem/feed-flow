@@ -74,7 +74,28 @@ object TranslationPlanner {
         val decision = LanguageGate.decide(text, feedMode, feedLanguage, languageTag)
         if (decision is GateDecision.Skip) return PlanResult.Skipped(decision.reason)
         val sourceLang = (decision as GateDecision.Translate).sourceLang
-        val source = text.orEmpty().trim()
+        return PlanResult.Planned(
+            planDecided(urlHash, field, text.orEmpty(), sourceLang, config, modelRev, context, protectedSpans),
+        )
+    }
+
+    /**
+     * The plan for a text that is already known to need translation, with
+     * its source language decided by the caller. Used for the pieces of an
+     * article block: the language is judged once for the block, and a piece
+     * holding little more than a code placeholder must not be skipped.
+     */
+    fun planDecided(
+        urlHash: String,
+        field: TranslationField,
+        text: String,
+        sourceLang: String?,
+        config: TranslationConfig,
+        modelRev: String,
+        context: String? = null,
+        protectedSpans: List<ProtectedSpan> = emptyList(),
+    ): TranslationPlan {
+        val source = text.trim()
         val ctx = context?.trim()?.takeIf { it.isNotEmpty() }
         val key = TranslationKey(
             urlHash = urlHash,
@@ -84,7 +105,7 @@ object TranslationPlanner {
             configHash = configHash(config, sourceLang),
             modelRev = modelRev,
         )
-        return PlanResult.Planned(TranslationPlan(key, source, sourceLang, ctx, config))
+        return TranslationPlan(key, source, sourceLang, ctx, config)
     }
 
     /**

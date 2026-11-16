@@ -56,6 +56,7 @@ class TranslationQueue(
         var priority: Priority,
         val seq: Long,
         val validate: ((String) -> Boolean)?,
+        val persist: Boolean,
     ) {
         val owners = mutableSetOf<Any>()
         val listeners = mutableListOf<(String) -> Unit>()
@@ -80,6 +81,8 @@ class TranslationQueue(
      * @param validate checks a finished text (for example that inline code
      *   survived); a text that fails is recorded as [FailureReason.CODE_CHECK]
      * @param onDelta called with the text so far while it is generated
+     * @param persist false leaves storing a successful result to the caller (article blocks are
+     *   stored only when all their pieces succeeded); failures are recorded either way
      */
     suspend fun submit(
         plan: TranslationPlan,
@@ -87,10 +90,11 @@ class TranslationQueue(
         priority: Priority,
         validate: ((String) -> Boolean)? = null,
         onDelta: ((String) -> Unit)? = null,
+        persist: Boolean = true,
     ): Deferred<Outcome> = mutex.withLock {
         val entry = entries[plan.key]?.also {
             if (priority < it.priority) it.priority = priority
-        } ?: Entry(plan, priority, seq++, validate).also {
+        } ?: Entry(plan, priority, seq++, validate, persist).also {
             entries[plan.key] = it
             wake.trySend(Unit)
         }
@@ -200,7 +204,7 @@ class TranslationQueue(
             cache.saveFailure(entry.plan.key, FailureReason.CODE_CHECK)
             return Outcome.Failure(FailureReason.CODE_CHECK)
         }
-        cache.saveSuccess(entry.plan.key, text)
+        if (entry.persist) cache.saveSuccess(entry.plan.key, text)
         return Outcome.Success(text)
     }
 
