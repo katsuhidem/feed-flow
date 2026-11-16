@@ -48,6 +48,7 @@ fun getReaderModeStyledHtml(
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
       ${readerModeCss(colors, fontSize, lineHeight, bodyFont, headlineFont, titleFontSize)}
+      ${readerTranslationCss()}
     </style>
     </head>
     <body>
@@ -197,6 +198,9 @@ fun getReaderModeStyledHtml(
               }
           });
         });
+    </script>
+    <script>
+        ${readerTranslationJs()}
     </script>
     </body>
     </html>
