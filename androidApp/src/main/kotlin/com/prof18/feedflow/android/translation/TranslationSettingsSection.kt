@@ -115,6 +115,9 @@ internal fun TranslationSettingsSection(setup: TranslationSetup, modifier: Modif
                 )
                 Switch(checked = injectFailures, onCheckedChange = { setup.prefs.setDebugInjectFailures(it) })
             }
+            OutlinedButton(onClick = { setup.debugForgetCheckArticle() }) {
+                Text("検証用: 確認用の記事の訳文と失敗の記録を消す")
+            }
         }
     }
 }

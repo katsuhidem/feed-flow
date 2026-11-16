@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.activity.compose.LocalActivity
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -794,6 +796,13 @@ private fun ReaderMode(
     )
 
     // fork (Phase 3): tell the translation which article the loaded page shows, and run its commands.
+    val activity = LocalActivity.current
+    DisposableEffect(translation) {
+        onDispose {
+            // Not when the activity is only being recreated (dark mode switch): the article stays open.
+            if (activity?.isChangingConfigurations != true) translation?.onReaderClosed()
+        }
+    }
     val pageLoaded = state.loadingState is LoadingState.Finished
     val shownArticleId = if (checkArticle) TranslationDebug.ARTICLE_ID else readerModeData.id.id
     LaunchedEffect(translation, shownArticleId) {

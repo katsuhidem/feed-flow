@@ -144,6 +144,16 @@ class TranslationCache(
         }
     }
 
+    /** Removes every stored translation and failure of one article. */
+    suspend fun forget(urlHash: String) {
+        withContext(dispatcher) {
+            db.transaction {
+                queries.deleteCacheForUrl(urlHash)
+                queries.deleteFailuresForUrl(urlHash)
+            }
+        }
+    }
+
     suspend fun clear() {
         withContext(dispatcher) {
             db.transaction {

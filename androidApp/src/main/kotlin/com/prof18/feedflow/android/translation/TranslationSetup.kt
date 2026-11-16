@@ -11,6 +11,7 @@ import io.github.katsuhidem.translation.FeedTranslationMode
 import io.github.katsuhidem.translation.LlamaCppEngine
 import io.github.katsuhidem.translation.TranslationEngine
 import com.prof18.feedflow.android.BuildConfig
+import co.touchlab.kermit.Logger
 import io.github.katsuhidem.translation.ModelCatalog
 import io.github.katsuhidem.translation.TitleTranslator
 import io.github.katsuhidem.translation.TranslationQueue
@@ -61,6 +62,14 @@ class TranslationSetup(private val app: Application) {
             canTranslate = { prefs.enabled.value && modelStore.isInstalled(titleModel) },
             recentTitles = { feedId -> titles.recent(feedId) },
         )
+    }
+
+    /** Debug builds: the check article starts again from nothing translated. */
+    fun debugForgetCheckArticle() {
+        scope.launch {
+            cache.forget(TranslationDebug.ARTICLE_ID)
+            Logger.withTag("ArticleTranslation").i { "check article forgotten" }
+        }
     }
 
     /** Article text uses the same model and queue as titles. */

@@ -32,6 +32,24 @@ class TranslationCacheTest {
     }
 
     @Test
+    fun forgetRemovesOneArticleAndLeavesTheOthers() = runTest {
+        val cache = newCache(StandardTestDispatcher(testScheduler))
+        val gone = planFor("Hello", urlHash = "u1").key
+        val goneFailure = planFor("Too long", urlHash = "u1").key
+        val kept = planFor("Hello", urlHash = "u2").key
+        cache.saveSuccess(gone, "こんにちは")
+        cache.saveFailure(goneFailure, FailureReason.TRUNCATED)
+        cache.saveSuccess(kept, "こんにちは")
+
+        cache.forget("u1")
+
+        val result = cache.lookup(listOf(gone, goneFailure, kept))
+        assertEquals(CacheResult.Missing, result[gone])
+        assertEquals(CacheResult.Missing, result[goneFailure])
+        assertEquals(CacheResult.Hit("こんにちは"), result[kept])
+    }
+
+    @Test
     fun changedConditionDoesNotReturnTheOldTranslation() = runTest {
         val cache = newCache(StandardTestDispatcher(testScheduler))
         val plain = planFor("Hello", urlHash = "u1", config = TranslationConfig(style = TranslationStyle.PLAIN)).key

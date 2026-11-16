@@ -82,6 +82,12 @@ DELETE FROM translation_failure WHERE rowid IN (
   SELECT rowid FROM translation_failure ORDER BY failed_at ASC LIMIT ?
 );
 
+deleteCacheForUrl:
+DELETE FROM translation_cache WHERE url_hash = ?;
+
+deleteFailuresForUrl:
+DELETE FROM translation_failure WHERE url_hash = ?;
+
 deleteAllCache:
 DELETE FROM translation_cache;
 

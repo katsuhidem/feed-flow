@@ -71,7 +71,11 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
     private var session: ArticleSession? = null
     private var job: Job? = null
 
-    /** True once the user asked for a translation of this article; a reloaded page is then translated again. */
+    /**
+     * True while the user wants this article translated: from a press of
+     * "translate" or "retry" until they stop the run or leave the reader.
+     * A page that reloads meanwhile (theme or inset change) is translated again.
+     */
     private var active = false
 
     /**
@@ -84,6 +88,24 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         if (articleId == this.articleId) return
         this.articleId = articleId
         stopRun()
+        session = null
+        sessionId = null
+        active = false
+        _ui.value = ArticleTranslationUi.Idle
+    }
+
+    /**
+     * The reader left the screen. This view model outlives the reader, so
+     * without this an article opened again later would still count as "being
+     * translated" and continue by itself. A running translation is stopped;
+     * what is stored shows again when the article is reopened.
+     */
+    fun onReaderClosed() {
+        log.d { "reader closed: active=$active" }
+        stopRun()
+        articleId = null
+        pageArticleId = null
+        pageToken = null
         session = null
         sessionId = null
         active = false
@@ -123,7 +145,10 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         when (val state = _ui.value) {
             ArticleTranslationUi.Collecting -> Unit
             is ArticleTranslationUi.Translating -> {
+                // Stopped by the user: a reload must not start it again.
+                active = false
                 stopRun()
+                log.i { "run stopped by the user" }
                 _ui.value = ArticleTranslationUi.Finished(canRetry = true, modelMissing = false)
             }
             ArticleTranslationUi.Idle -> {
