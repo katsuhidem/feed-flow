@@ -32,10 +32,21 @@ class TranslationPrefs(context: Context) {
         _style.value = value
     }
 
+    /**
+     * Tuning read once at start: inference threads and their nice value. Null means the default.
+     * There is no UI for these; they were used to measure scrolling during translation (see
+     * docs/STATUS.md, 2026-11-16) and neither changed the result, so the defaults stay.
+     */
+    val debugThreads: Int? = prefs.getInt(KEY_DEBUG_THREADS, 0).takeIf { it > 0 }
+    val debugThreadPriority: Int? = prefs.getInt(KEY_DEBUG_PRIORITY, NO_VALUE).takeIf { it != NO_VALUE }
+
     fun config(): TranslationConfig = TranslationConfig(style = _style.value)
 
     private companion object {
         const val KEY_ENABLED = "enabled"
         const val KEY_STYLE = "style"
+        const val KEY_DEBUG_THREADS = "debug_threads"
+        const val KEY_DEBUG_PRIORITY = "debug_thread_priority"
+        const val NO_VALUE = Int.MIN_VALUE
     }
 }

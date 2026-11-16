@@ -36,7 +36,11 @@ class TranslationSetup(private val app: Application) {
     val titleModel = ModelCatalog.DEFAULT
 
     private val titles = FeedTitleRegistry()
-    private val engine = LlamaCppEngine(modelFile = { modelStore.file(titleModel) })
+    private val engine = LlamaCppEngine(
+        modelFile = { modelStore.file(titleModel) },
+        threads = prefs.debugThreads ?: LlamaCppEngine.DEFAULT_THREADS,
+        threadPriority = prefs.debugThreadPriority ?: LlamaCppEngine.DEFAULT_THREAD_PRIORITY,
+    )
     private val queue by lazy { TranslationQueue(engine, cache, scope) }
 
     val titleTranslator by lazy {
