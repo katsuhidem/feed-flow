@@ -9,6 +9,8 @@ import com.prof18.feedflow.shared.domain.feed.TimelineTitleTranslations
 import io.github.katsuhidem.translation.ArticleTranslator
 import io.github.katsuhidem.translation.FeedTranslationMode
 import io.github.katsuhidem.translation.LlamaCppEngine
+import io.github.katsuhidem.translation.TranslationEngine
+import com.prof18.feedflow.android.BuildConfig
 import io.github.katsuhidem.translation.ModelCatalog
 import io.github.katsuhidem.translation.TitleTranslator
 import io.github.katsuhidem.translation.TranslationQueue
@@ -39,11 +41,15 @@ class TranslationSetup(private val app: Application) {
     val titleModel = ModelCatalog.DEFAULT
 
     private val titles = FeedTitleRegistry()
-    private val engine = LlamaCppEngine(
+    private val llama = LlamaCppEngine(
         modelFile = { modelStore.file(titleModel) },
         threads = prefs.debugThreads ?: LlamaCppEngine.DEFAULT_THREADS,
         threadPriority = prefs.debugThreadPriority ?: LlamaCppEngine.DEFAULT_THREAD_PRIORITY,
     )
+
+    /** Debug builds can make marked paragraphs of the check article fail (see TranslationDebug). */
+    private val engine: TranslationEngine =
+        if (BuildConfig.DEBUG) FaultInjectingEngine(llama) { prefs.debugInjectFailures.value } else llama
     private val queue by lazy { TranslationQueue(engine, cache, scope) }
 
     val titleTranslator by lazy {

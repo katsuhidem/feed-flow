@@ -3,6 +3,7 @@ package com.prof18.feedflow.android.translation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
+import com.prof18.feedflow.android.BuildConfig
 import io.github.katsuhidem.translation.ArticleBlock
 import io.github.katsuhidem.translation.ArticleSession
 import io.github.katsuhidem.translation.BlockState
@@ -47,6 +48,10 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
 
     private val _ui = MutableStateFlow<ArticleTranslationUi>(ArticleTranslationUi.Idle)
     val ui: StateFlow<ArticleTranslationUi> = _ui.asStateFlow()
+
+    /** Debug builds: reader mode shows the built-in check article instead of the opened one. */
+    val debugCheckArticle: StateFlow<Boolean> =
+        if (BuildConfig.DEBUG) setup.prefs.debugCheckArticle else MutableStateFlow(false)
 
     private val commands = Channel<String>(Channel.UNLIMITED)
 

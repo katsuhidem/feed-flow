@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.prof18.feedflow.android.BuildConfig
 import io.github.katsuhidem.translation.ModelCatalog
 import io.github.katsuhidem.translation.ModelState
 import io.github.katsuhidem.translation.TranslationStyle
@@ -94,6 +95,27 @@ internal fun TranslationSettingsSection(setup: TranslationSetup, modifier: Modif
                 )
             },
         ) { Text("${ModelCatalog.LICENSE_NAME} を表示") }
+
+        if (BuildConfig.DEBUG) {
+            val checkArticle by setup.prefs.debugCheckArticle.collectAsStateWithLifecycle()
+            val injectFailures by setup.prefs.debugInjectFailures.collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "検証用: リーダーモードで確認用の記事を表示する",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = checkArticle, onCheckedChange = { setup.prefs.setDebugCheckArticle(it) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "検証用: 確認用の記事の、印のある段落を失敗させる",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = injectFailures, onCheckedChange = { setup.prefs.setDebugInjectFailures(it) })
+            }
+        }
     }
 }
 

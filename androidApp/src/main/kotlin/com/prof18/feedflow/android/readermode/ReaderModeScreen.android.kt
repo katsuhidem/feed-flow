@@ -2,6 +2,7 @@ package com.prof18.feedflow.android.readermode
 
 import com.prof18.feedflow.android.translation.ArticleTranslationViewModel
 import com.prof18.feedflow.android.translation.ArticleTranslationButton
+import com.prof18.feedflow.android.translation.TranslationDebug
 import android.webkit.CookieManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -679,16 +680,19 @@ private fun ReaderMode(
     // The HTML embeds the chosen fonts and is several MB, so build it only when its inputs change.
     // The text settings are deliberately not keys: changing them restyles the page through JavaScript
     // without a reload, while any rebuild (theme, insets) reads their current values.
-    val content = remember(readerModeData, colors, spacerHeightDp, strings) {
+    // fork (Phase 3): a debug build can show a built-in check article instead (see TranslationDebug).
+    val checkArticle = translation?.debugCheckArticle?.collectAsStateWithLifecycle()?.value == true
+    val shownTitle = if (checkArticle) TranslationDebug.TITLE else readerModeData.title
+    val content = remember(readerModeData, colors, spacerHeightDp, strings, checkArticle) {
         getReaderModeStyledHtml(
             colors = colors,
-            content = readerModeData.content,
+            content = if (checkArticle) TranslationDebug.ARTICLE_HTML else readerModeData.content,
             fontSize = fontSize,
             lineHeight = lineHeight,
             bodyFont = bodyFont,
             headlineFont = headlineFont,
             titleFontSize = titleFontSize,
-            title = readerModeData.title,
+            title = shownTitle,
             imageUrl = readerModeData.imageUrl,
             leadingContent = "<div id=\"__feedflow_top_spacer\" style=\"height: ${spacerHeightDp}px;\"></div>",
             siteName = readerModeData.siteName,
@@ -791,9 +795,13 @@ private fun ReaderMode(
 
     // fork (Phase 3): tell the translation which article the loaded page shows, and run its commands.
     val pageLoaded = state.loadingState is LoadingState.Finished
-    val shownArticleId = readerModeData.id.id
+    val shownArticleId = if (checkArticle) TranslationDebug.ARTICLE_ID else readerModeData.id.id
     LaunchedEffect(translation, shownArticleId) {
-        translation?.setArticle(shownArticleId, readerModeData.title, readerModeData.languageTag)
+        translation?.setArticle(
+            shownArticleId,
+            shownTitle,
+            if (checkArticle) null else readerModeData.languageTag,
+        )
     }
     LaunchedEffect(translation, pageLoaded, shownArticleId) {
         // The page answers through the "translationPage" handler with a token for the loaded document.
