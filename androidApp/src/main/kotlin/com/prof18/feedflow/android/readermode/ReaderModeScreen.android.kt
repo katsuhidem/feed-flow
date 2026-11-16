@@ -670,7 +670,6 @@ private fun ReaderMode(
     val latestOpenImage by rememberUpdatedState(onImageClick)
     val latestExpand by rememberUpdatedState(onExpandToolbar)
     val latestCollapse by rememberUpdatedState(onCollapseToolbar)
-    val latestArticle by rememberUpdatedState(readerModeState.readerModeData)
 
     @Suppress("MagicNumber")
     val spacerHeightDp = (contentPadding.calculateTopPadding().value - 40f).toInt().coerceAtLeast(0)
@@ -776,12 +775,7 @@ private fun ReaderMode(
                     callback: (String) -> Unit,
                 ) {
                     bridgeScope.launch(Dispatchers.Main.immediate) {
-                        translation?.onPageReady(
-                            latestArticle.id.id,
-                            latestArticle.title,
-                            latestArticle.languageTag,
-                            pageToken = message.params,
-                        )
+                        translation?.onPageReady(pageToken = message.params)
                     }
                 }
 
@@ -798,6 +792,9 @@ private fun ReaderMode(
     // fork (Phase 3): tell the translation which article the loaded page shows, and run its commands.
     val pageLoaded = state.loadingState is LoadingState.Finished
     val shownArticleId = readerModeData.id.id
+    LaunchedEffect(translation, shownArticleId) {
+        translation?.setArticle(shownArticleId, readerModeData.title, readerModeData.languageTag)
+    }
     LaunchedEffect(translation, pageLoaded, shownArticleId) {
         // The page answers through the "translationPage" handler with a token for the loaded document.
         if (pageLoaded && translation != null) {

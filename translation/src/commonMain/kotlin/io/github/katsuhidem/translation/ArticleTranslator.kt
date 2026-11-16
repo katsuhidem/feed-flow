@@ -48,6 +48,7 @@ sealed interface BlockUpdate {
 class RunSummary(
     val done: Int,
     val failed: Int,
+    /** Cancelled, stopped by an error, or (after a cached-only run) still waiting. */
     val interrupted: Int,
     val skipped: Int,
     /** Blocks were left untranslated because no model is installed. */
@@ -131,8 +132,16 @@ class ArticleSession internal constructor(
      * apply (after a style change) disappear.
      *
      * Cancelling the caller cancels this session's requests only.
+     *
+     * @param cachedOnly show what the cache has and stop: nothing is queued
+     *   and no model is loaded. Used when an article is opened, before the
+     *   user asks for a translation.
      */
-    suspend fun run(retryFailed: Boolean, onUpdate: (BlockUpdate) -> Unit): RunSummary {
+    suspend fun run(
+        retryFailed: Boolean,
+        cachedOnly: Boolean = false,
+        onUpdate: (BlockUpdate) -> Unit,
+    ): RunSummary {
         val config = translator.currentConfig()
         val modelRev = translator.currentModelRev()
         val cache = translator.translationCache
@@ -162,8 +171,8 @@ class ArticleSession internal constructor(
         }
         _states.value = states.toMap()
 
-        val modelMissing = toRun.isNotEmpty() && !translator.modelInstalled()
-        if (toRun.isNotEmpty() && !modelMissing) translate(toRun, onUpdate)
+        val modelMissing = !cachedOnly && toRun.isNotEmpty() && !translator.modelInstalled()
+        if (!cachedOnly && toRun.isNotEmpty() && !modelMissing) translate(toRun, onUpdate)
 
         val end = _states.value
         return RunSummary(

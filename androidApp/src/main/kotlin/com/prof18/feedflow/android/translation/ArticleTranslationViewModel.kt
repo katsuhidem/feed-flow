@@ -11,6 +11,7 @@ import io.github.katsuhidem.translation.ProtectedSpan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,6 +56,10 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
     private val ids = AtomicLong(0)
     private var articleId: String? = null
     private var pageToken: String? = null
+
+    /** The article whose page last reported itself; the button waits until it is the shown article. */
+    private var pageArticleId: String? = null
+    private var collectTimeout: Job? = null
     private var title: String? = null
     private var languageTag: String? = null
     private var sessionId: String? = null
@@ -65,32 +70,51 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
     private var active = false
 
     /**
-     * The reader page reported itself after loading. A new article resets
-     * everything; a reload of the same article (theme or inset change) lost
-     * the inserted translations, so they are put back from the cache.
-     *
-     * @param pageToken identifies the loaded document. "Page finished" is
-     *   also signalled without a reload (late images, for example); the same
-     *   token for the same article means nothing changed, and a running
-     *   translation must not be restarted.
+     * The reader shows [articleId] (its page may still be loading). A new
+     * article resets the translation state.
      */
-    fun onPageReady(articleId: String, title: String?, languageTag: String?, pageToken: String) {
-        val sameArticle = articleId == this.articleId
-        if (sameArticle && pageToken == this.pageToken) return
-        log.d { "page ready: sameArticle=$sameArticle active=$active" }
-        this.pageToken = pageToken
-        stopRun()
-        this.articleId = articleId
+    fun setArticle(articleId: String, title: String?, languageTag: String?) {
         this.title = title
         this.languageTag = languageTag
+        if (articleId == this.articleId) return
+        this.articleId = articleId
+        stopRun()
         session = null
         sessionId = null
-        if (!sameArticle) active = false
-        if (active) collect() else _ui.value = ArticleTranslationUi.Idle
+        active = false
+        _ui.value = ArticleTranslationUi.Idle
+    }
+
+    /**
+     * The reader page reported itself after loading.
+     *
+     * @param pageToken identifies the loaded document. "Page finished" is
+     *   also signalled without a reload (late images, for example), and the
+     *   page of the previous article answers once more while the next one
+     *   loads. The token last seen means nothing changed: a running
+     *   translation is not restarted, and the old page is never listed under
+     *   the new article.
+     */
+    fun onPageReady(pageToken: String) {
+        if (pageToken == this.pageToken) return
+        log.d { "page ready: active=$active" }
+        this.pageToken = pageToken
+        pageArticleId = articleId
+        stopRun()
+        session = null
+        sessionId = null
+        // Always list the blocks: what the cache already has is shown at once, without a model.
+        // Only a press of the button translates the rest. A reload of the same article
+        // (theme or inset change) gets its translations back the same way.
+        if (active || setup.prefs.enabled.value) collect() else _ui.value = ArticleTranslationUi.Idle
     }
 
     /** The toolbar button: translate, stop a running translation, or retry what failed. */
     fun onButtonClick() {
+        if (articleId == null || pageArticleId != articleId) {
+            log.d { "button ignored: the page of this article has not reported yet" }
+            return
+        }
         when (val state = _ui.value) {
             ArticleTranslationUi.Collecting -> Unit
             is ArticleTranslationUi.Translating -> {
@@ -99,7 +123,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
             }
             ArticleTranslationUi.Idle -> {
                 active = true
-                collect()
+                if (session == null) collect() else startRun(retryFailed = false)
             }
             is ArticleTranslationUi.Finished -> {
                 active = true
@@ -114,6 +138,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         try {
             val message = JSONObject(json)
             if (message.getString("session") != sessionId) return
+            collectTimeout?.cancel()
             val array = message.getJSONArray("blocks")
             val blocks = (0 until array.length()).map { i ->
                 val block = array.getJSONObject(i)
@@ -128,7 +153,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                 )
             }
             session = setup.articleTranslator.open(id, title, blocks, languageTag)
-            startRun(retryFailed = false)
+            startRun(retryFailed = false, cachedOnly = !active)
         } catch (e: Exception) {
             log.w(e) { "could not read the page's blocks" }
             _ui.value = ArticleTranslationUi.Idle
@@ -141,9 +166,18 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         session = null
         _ui.value = ArticleTranslationUi.Collecting
         commands.trySend("window.feedflowTranslation && window.feedflowTranslation.collect(${JSONObject.quote(newSession)});")
+        // If the page never answers, give the button back.
+        collectTimeout?.cancel()
+        collectTimeout = viewModelScope.launch {
+            delay(COLLECT_TIMEOUT_MILLIS)
+            if (sessionId == newSession && session == null && _ui.value == ArticleTranslationUi.Collecting) {
+                log.w { "the page did not report its blocks" }
+                _ui.value = ArticleTranslationUi.Idle
+            }
+        }
     }
 
-    private fun startRun(retryFailed: Boolean) {
+    private fun startRun(retryFailed: Boolean, cachedOnly: Boolean = false) {
         val current = session ?: return
         val sid = sessionId ?: return
         stopRun()
@@ -151,7 +185,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         val s = JSONObject.quote(sid)
         val r = JSONObject.quote(runId)
         commands.trySend("window.feedflowTranslation.beginRun($s, $r);")
-        _ui.value = ArticleTranslationUi.Translating(0, 0)
+        if (!cachedOnly) _ui.value = ArticleTranslationUi.Translating(0, 0)
         job = viewModelScope.launch {
             val progress = launch {
                 current.states.collect { states ->
@@ -163,7 +197,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                 }
             }
             try {
-                val summary = current.run(retryFailed) { update ->
+                val summary = current.run(retryFailed, cachedOnly) { update ->
                     commands.trySend(
                         when (update) {
                             is BlockUpdate.Partial ->
@@ -176,10 +210,15 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                     )
                 }
                 log.i {
-                    "run done=${summary.done} failed=${summary.failed} interrupted=${summary.interrupted} " +
+                    "run cachedOnly=$cachedOnly done=${summary.done} failed=${summary.failed} interrupted=${summary.interrupted} " +
                         "skipped=${summary.skipped} modelMissing=${summary.modelMissing}"
                 }
-                _ui.value = ArticleTranslationUi.Finished(summary.canRetry || summary.modelMissing, summary.modelMissing)
+                _ui.value = if (cachedOnly) {
+                    // Shown from the cache on opening; the button still offers to translate (the rest).
+                    ArticleTranslationUi.Idle
+                } else {
+                    ArticleTranslationUi.Finished(summary.canRetry || summary.modelMissing, summary.modelMissing)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -199,5 +238,9 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
 
     override fun onCleared() {
         stopRun()
+    }
+
+    private companion object {
+        const val COLLECT_TIMEOUT_MILLIS = 5_000L
     }
 }

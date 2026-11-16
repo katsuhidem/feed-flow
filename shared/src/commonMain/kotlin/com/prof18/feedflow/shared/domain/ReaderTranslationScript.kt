@@ -184,9 +184,15 @@ window.feedflowTranslation = (function () {
   return {
     // Reports which document this is.
     ping: function () {
-      if (window.kmpJsBridge && window.kmpJsBridge.callNative) {
-        window.kmpJsBridge.callNative("translationPage", pageToken, {});
-      }
+      // The bridge is injected when the page finishes loading; wait for it briefly.
+      var tries = 0;
+      (function attempt() {
+        if (window.kmpJsBridge && window.kmpJsBridge.callNative) {
+          window.kmpJsBridge.callNative("translationPage", pageToken, {});
+        } else if (tries++ < 30) {
+          setTimeout(attempt, 100);
+        }
+      })();
       return pageToken;
     },
     // Collects the blocks of the article and reports them to the app.

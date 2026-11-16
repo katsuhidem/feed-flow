@@ -97,7 +97,7 @@ class ArticleTranslatorTest {
         val f = Fixture(this)
         val session = f.open(ArticleBlock(1, "plain paragraph"), codeBlock)
         val updates = Updates()
-        session.run(false, updates.sink)
+        session.run(false, onUpdate = updates.sink)
 
         assertEquals(listOf(1), updates.partials(), "only the block without code streams")
         assertEquals(
@@ -114,7 +114,7 @@ class ArticleTranslatorTest {
         f.engine.terminal = { TranslationEvent.Completed(it.uppercase().replace("[[2]]", "")) }
         val session = f.open(codeBlock)
         val updates = Updates()
-        val summary = session.run(false, updates.sink)
+        val summary = session.run(false, onUpdate = updates.sink)
 
         assertNull(updates.shown(3))
         assertTrue(updates.all.none { it is BlockUpdate.Done || it is BlockUpdate.Partial })
@@ -123,7 +123,7 @@ class ArticleTranslatorTest {
 
         // "Translate" again: the failure record keeps it out of the queue.
         val before = f.engine.translated.size
-        session.run(false, updates.sink)
+        session.run(false, onUpdate = updates.sink)
         assertEquals(before, f.engine.translated.size)
 
         // "Retry" lifts the suppression; this time the engine behaves.
@@ -142,7 +142,7 @@ class ArticleTranslatorTest {
         }
         val session = f.open(block, title = null)
         val updates = Updates()
-        val summary = session.run(false, updates.sink)
+        val summary = session.run(false, onUpdate = updates.sink)
 
         assertEquals(3, f.engine.translated.size, "the block was split into three pieces")
         assertTrue(updates.all.none { it is BlockUpdate.Done || it is BlockUpdate.Partial }, "nothing of the block is shown")
@@ -150,7 +150,7 @@ class ArticleTranslatorTest {
         // None of the pieces that did succeed was stored.
         assertTrue(f.cache.lookup(emptyList()).isEmpty())
         val again = Updates()
-        session.run(false, again.sink)
+        session.run(false, onUpdate = again.sink)
         assertTrue(again.done().isEmpty(), "no piece comes back from the cache")
     }
 
@@ -168,7 +168,7 @@ class ArticleTranslatorTest {
         )
         val session = f.open(block, title = null)
         val updates = Updates()
-        val summary = session.run(false, updates.sink)
+        val summary = session.run(false, onUpdate = updates.sink)
 
         assertEquals(1, summary.done)
         assertTrue(f.engine.translated.size >= 3)
@@ -189,7 +189,7 @@ class ArticleTranslatorTest {
         assertEquals(1, f.engine.unloadCount)
 
         val updates = Updates()
-        val summary = f.open(*blocks).run(false, updates.sink)
+        val summary = f.open(*blocks).run(false, onUpdate = updates.sink)
         assertEquals(2, summary.done)
         assertEquals(setOf(1, 3), updates.done().keys)
         advanceTimeBy(1_500)
@@ -207,7 +207,7 @@ class ArticleTranslatorTest {
         f.config = TranslationConfig(style = TranslationStyle.POLITE)
         f.engine.terminal = { TranslationEvent.Completed("polite: $it") }
         val updates = Updates()
-        session.run(false, updates.sink)
+        session.run(false, onUpdate = updates.sink)
         // The old text is cleared before the new one arrives.
         assertEquals(BlockUpdate.Cleared(1), updates.all.first())
         assertEquals("polite: first paragraph", updates.shown(1))
@@ -222,7 +222,7 @@ class ArticleTranslatorTest {
         f.engine.started = CompletableDeferred()
         val session = f.open(ArticleBlock(1, "first paragraph"), ArticleBlock(2, "second paragraph"))
         val updates = Updates()
-        val job = launch { session.run(false, updates.sink) }
+        val job = launch { session.run(false, onUpdate = updates.sink) }
         f.engine.started!!.await()
         runCurrent()
         assertEquals(listOf(1), updates.partials())
@@ -272,10 +272,10 @@ class ArticleTranslatorTest {
         f.engine.tokensFor = { 2_000 }
         val session = f.open(ArticleBlock(1, "a paragraph the tokenizer finds huge"))
         val updates = Updates()
-        assertEquals(1, session.run(false, updates.sink).failed)
+        assertEquals(1, session.run(false, onUpdate = updates.sink).failed)
         assertNull(updates.shown(1))
-        session.run(false, updates.sink)
-        session.run(false, updates.sink)
+        session.run(false, onUpdate = updates.sink)
+        session.run(false, onUpdate = updates.sink)
         assertTrue(f.engine.translated.isEmpty(), "never sent to inference, and not counted again and again")
     }
 
@@ -285,10 +285,33 @@ class ArticleTranslatorTest {
         f.open(ArticleBlock(1, "first paragraph")).run(false) {}
         f.installed = false
         val updates = Updates()
-        val summary = f.open(ArticleBlock(1, "first paragraph"), ArticleBlock(2, "second paragraph")).run(false, updates.sink)
+        val summary = f.open(ArticleBlock(1, "first paragraph"), ArticleBlock(2, "second paragraph")).run(false, onUpdate = updates.sink)
         assertTrue(summary.modelMissing)
         assertEquals(setOf(1), updates.done().keys)
         assertEquals(1, f.engine.translated.size)
+    }
+
+    @Test
+    fun cachedOnlyRunShowsWhatIsStoredAndTranslatesNothing() = runTest {
+        val f = Fixture(this, idleUnloadMillis = 1_000)
+        f.open(ArticleBlock(1, "first paragraph")).run(false) {}
+        advanceTimeBy(1_500)
+        runCurrent()
+        val loads = f.engine.loadCount
+
+        val session = f.open(ArticleBlock(1, "first paragraph"), ArticleBlock(2, "second paragraph"))
+        val updates = Updates()
+        val summary = session.run(retryFailed = false, cachedOnly = true, onUpdate = updates.sink)
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(mapOf(1 to "FIRST PARAGRAPH"), updates.done())
+        assertEquals(1, summary.done)
+        assertFalse(summary.modelMissing)
+        assertEquals(BlockState.PENDING, session.states.value[2])
+        assertEquals(loads, f.engine.loadCount, "opening an article never loads the model")
+
+        // The button then translates the rest from the same block list.
+        assertEquals(2, session.run(false, onUpdate = updates.sink).done)
     }
 
     @Test
