@@ -48,6 +48,12 @@ tasks.withType<KotlinCompilationTask<*>>().configureEach {
 tasks.withType<KspAATask>().configureEach {
     if (name != "kspCommonMainKotlinMetadata") {
         dependsOn("kspCommonMainKotlinMetadata")
+    } else {
+        // fork (Phase 4b): Lyricist reads the XML through a processor argument, which Gradle does
+        // not track, so an edited strings.xml left the generated strings unchanged.
+        inputs.dir("$projectDir/src/commonMain/resources/locale")
+            .withPropertyName("lyricistStrings")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
     }
 }
 

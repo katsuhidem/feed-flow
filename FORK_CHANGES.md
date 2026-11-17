@@ -42,6 +42,8 @@
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/ContentPrefetchRepositoryImpl.kt` | Phase 4a: 同期直後の取得で、止められたら残りを試さずに待ち行列へ回す | 4a |
 | `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/WorkManagerBackgroundPrefetchScheduler.kt` | Phase 4a: 「Wi-Fi のときだけ」がオンなら、WorkManager の条件を「従量制でない回線」にする | 4a |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt`、`shared/src/androidMain/kotlin/com/prof18/feedflow/shared/di/KoinAndroid.kt` | Phase 4a: 先読みの部品に `ContentPrefetchGate` を渡す(`getOrNull()`、1行ずつ) | 4a |
+| `i18n/src/commonMain/resources/locale/values-ja/strings.xml` | Phase 4b: 上流に無い日本語の訳 341 件を、末尾に注釈付きでまとめて足した(英語のファイルの順)。上流の翻訳の更新を cherry-pick して同じ名前が増えたら、どちらか一方を残す | 4b |
+| `i18n/build.gradle.kts` | Phase 4b: 文字列を生成する KSP の処理に、言語ファイルのフォルダを入力として登録した(登録しないと、言語ファイルを変えても生成し直されない) | 4b |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 

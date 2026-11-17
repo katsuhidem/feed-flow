@@ -40,7 +40,7 @@ internal fun DataUseSettingsSection(setup: DataUseSetup, modifier: Modifier = Mo
         }
         Text(
             text = "本文の先読み(オフライン用の保存)そのものは、この画面の上のほうにある" +
-                "「Make offline copies when feeds refresh」でオンにします。" +
+                "「フィードの更新時にオフライン用のコピーを作る」でオンにします。" +
                 "モバイル回線で止めた分は、Wi-Fi につながったときに取得します。",
             style = MaterialTheme.typography.bodySmall,
         )
