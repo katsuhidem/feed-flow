@@ -260,6 +260,18 @@ internal fun readerTranslationCss(): String = """
         font-style: normal;
         text-align: start;
       }
+      /*
+       * The translation of the article title sits next to the h1, outside #__content.
+       * Give it the column of the title's text: the h1 is at most 700px wide plus 16px
+       * of padding on each side, centred. Without this it spans the whole page.
+       */
+      body > .__ff_tr {
+        box-sizing: border-box;
+        width: calc(100% - 32px);
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+      }
       li > .__ff_tr, td > .__ff_tr, th > .__ff_tr, dd > .__ff_tr, dt > .__ff_tr {
         margin: 0.25em 0 0.35em 0;
       }
