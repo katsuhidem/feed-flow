@@ -66,9 +66,26 @@ class DuplicateReadTest {
     }
 
     @Test
-    fun withoutAnEarlierCheckTheFirstInsertedIsKept() {
+    fun withoutAnEarlierCheckEveryArticleCountsAsNewAndTheFirstPublishedIsKept() {
         val rows = listOf(row(3, "https://example.com/a", pubDate = 2_000), row(4, "https://example.com/a", pubDate = 1_000))
-        assertEquals(setOf("id4"), DuplicateRead.articlesToMarkRead(rows, lastCheckedRowId = null))
+        assertEquals(setOf("id3"), DuplicateRead.articlesToMarkRead(rows, lastCheckedRowId = null))
+    }
+
+    @Test
+    fun aCopyMarkedReadByAnEarlierCheckDoesNotMakeTheKeptOneRead() {
+        // First check: row 2 arrived after row 1 and was marked as read.
+        val first = listOf(row(1, "https://example.com/a"), row(2, "https://example.com/a"))
+        assertEquals(setOf("id2"), DuplicateRead.articlesToMarkRead(first, lastCheckedRowId = 1))
+        // Next check: nothing new, row 1 stays unread.
+        val next = listOf(row(1, "https://example.com/a"), row(2, "https://example.com/a", isRead = true))
+        assertEquals(emptySet(), DuplicateRead.articlesToMarkRead(next, lastCheckedRowId = 2))
+    }
+
+    @Test
+    fun anArticleThatWasAlreadyThereIsNeverMarkedEvenWhenAnotherCopyIsRead() {
+        // Row 1 unread and old, row 3 new and already read on the server: row 1 is left alone.
+        val rows = listOf(row(1, "https://example.com/a"), row(3, "https://example.com/a", isRead = true))
+        assertEquals(emptySet(), DuplicateRead.articlesToMarkRead(rows, lastCheckedRowId = 2))
     }
 
     @Test

@@ -47,34 +47,36 @@ object DuplicateRead {
     /**
      * The articles to mark as read.
      *
-     * In each group of articles with the same URL: when one of them is read, every unread one is
-     * marked as read. When all are unread, one is kept: the first one inserted among those that
-     * were already there at the last check ([lastCheckedRowId]), or, when all are new since then,
-     * the one published first. Nothing is ever marked as unread.
+     * Only articles that arrived since the last check ([lastCheckedRowId]) can be marked; an
+     * article that was already there is never touched again, whether it is read (by the user or
+     * by an earlier check) or not. In each group of articles with the same URL:
+     * - when an article that was already there is in the group, every unread new one is marked
+     *   as read (the old one stays as it is);
+     * - when all are new: if one of them is read, the unread ones are marked as read; otherwise
+     *   the one published first is kept unread and the others are marked as read.
+     * Nothing is ever marked as unread.
      *
      * @param lastCheckedRowId the highest row id seen at the last check; null when never checked,
-     *   which treats every article as already there
+     *   which treats every article as new
      */
     fun articlesToMarkRead(rows: List<DuplicateReadRow>, lastCheckedRowId: Long?): Set<String> {
         val out = mutableSetOf<String>()
+        fun isNew(row: DuplicateReadRow) = lastCheckedRowId == null || row.rowId > lastCheckedRowId
         rows.groupBy { normalizeUrl(it.url) }
             .filterKeys { it != null }
             .values
             .filter { it.size > 1 }
             .forEach { group ->
-                val unread = group.filterNot { it.isRead }
-                if (unread.isEmpty()) return@forEach
-                if (group.any { it.isRead }) {
-                    unread.mapTo(out) { it.id }
+                val new = group.filter(::isNew)
+                val newUnread = new.filterNot { it.isRead }
+                if (newUnread.isEmpty()) return@forEach
+                val hasOld = new.size < group.size
+                if (hasOld || new.any { it.isRead }) {
+                    newUnread.mapTo(out) { it.id }
                     return@forEach
                 }
-                val earlier = group.filter { lastCheckedRowId == null || it.rowId <= lastCheckedRowId }
-                val keep = if (earlier.isNotEmpty()) {
-                    earlier.minBy { it.rowId }
-                } else {
-                    group.minWith(compareBy<DuplicateReadRow>({ it.pubDate ?: Long.MAX_VALUE }, { it.rowId }))
-                }
-                group.filter { it !== keep }.mapTo(out) { it.id }
+                val keep = new.minWith(compareBy<DuplicateReadRow>({ it.pubDate ?: Long.MAX_VALUE }, { it.rowId }))
+                new.filter { it !== keep }.mapTo(out) { it.id }
             }
         return out
     }
