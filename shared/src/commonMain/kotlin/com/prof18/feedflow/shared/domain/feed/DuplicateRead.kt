@@ -101,14 +101,16 @@ class DuplicateReadMarker internal constructor(
         }
 
     suspend fun afterSync() {
+        val rows = databaseHelper.getDuplicateReadRows()
+        val lastChecked = settings.getLongOrNull(KEY_LAST_ROW_ID)
+        // Recorded also while switched off, so turning it on later does not reach back to
+        // the articles that arrived in the meantime.
+        rows.maxOfOrNull { it.rowId }?.let { settings.putLong(KEY_LAST_ROW_ID, maxOf(it, lastChecked ?: it)) }
         if (!enabled) {
             logger.i { "duplicate check skipped: disabled" }
             return
         }
-        val rows = databaseHelper.getDuplicateReadRows()
-        val lastChecked = settings.getLongOrNull(KEY_LAST_ROW_ID)
         val ids = DuplicateRead.articlesToMarkRead(rows, lastChecked)
-        rows.maxOfOrNull { it.rowId }?.let { settings.putLong(KEY_LAST_ROW_ID, maxOf(it, lastChecked ?: it)) }
         logger.i { "duplicate check: articles=${rows.size} marked_read=${ids.size}" }
         if (ids.isNotEmpty()) markAsRead(ids.mapTo(HashSet()) { FeedItemId(it) })
     }
