@@ -30,7 +30,7 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行 | 3。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeToolbar.kt` | `actions` 引数を追加 | 3 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す | 1 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す | 1。Phase 4a: 通信量の制御の組み立て(`DataUseSetup`)を起動時に作る1行 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/utils/ImageLoader.kt` | `coilImageLoader` に `okHttpClient` 引数を追加し、`OkHttpNetworkFetcherFactory` で使う | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/accounts/freshrss/FreshRssSyncScreen.android.kt` | Tailscale の欄を表示し、ログイン時に入力された URL を tailnet の対象にする | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/accounts/freshrss/FreshRssSyncComponents.kt` | `FreshRssSyncContent` に `headerContent` 引数を追加 | 1 |
