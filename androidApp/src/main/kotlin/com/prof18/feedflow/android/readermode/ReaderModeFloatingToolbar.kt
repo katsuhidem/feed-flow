@@ -268,7 +268,7 @@ fun ReaderModeFloatingToolbar(
                 )
             }
             if (readerModeState is ReaderModeState.Success) {
-                add(speechToolbarAction(isPreparingSpeech, isSpeechPlaying, strings) { latestOnListenClick() })
+                // fork (Phase 4c): no "listen to article" button
                 add(
                     ToolbarAction(
                         icon = Icons.Outlined.TextFields,
@@ -287,7 +287,7 @@ fun ReaderModeFloatingToolbar(
                     ),
                 )
             }
-            addReportAction(articleReportState, strings) { latestOnReportArticle() }
+            // fork (Phase 4c): no "report broken article" button (it sends the article link to upstream)
         }
             .toImmutableList()
     }
