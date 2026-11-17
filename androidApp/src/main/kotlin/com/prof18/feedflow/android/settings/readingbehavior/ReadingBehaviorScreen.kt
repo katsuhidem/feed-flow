@@ -1,5 +1,8 @@
 package com.prof18.feedflow.android.settings.readingbehavior
 
+import androidx.compose.foundation.layout.Column
+import com.prof18.feedflow.android.datause.DataUseSettingsSection
+import com.prof18.feedflow.android.datause.DataUseSetup
 import com.prof18.feedflow.android.translation.TranslationSettingsSection
 import com.prof18.feedflow.android.translation.TranslationSetup
 import androidx.compose.runtime.Composable
@@ -24,10 +27,16 @@ internal fun ReadingBehaviorScreen(
     val strings = LocalFeedFlowStrings.current
 
     val translation = koinInject<TranslationSetup>()
+    val dataUse = koinInject<DataUseSetup>()
 
     ReadingBehaviorScreenContent(
         navigateBack = navigateBack,
-        footerContent = { TranslationSettingsSection(translation) },
+        footerContent = {
+            Column {
+                TranslationSettingsSection(translation)
+                DataUseSettingsSection(dataUse)
+            }
+        },
         state = state,
         browsers = browserListState.map { browser ->
             if (browser.id == BrowserIds.IN_APP_BROWSER) {

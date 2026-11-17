@@ -124,6 +124,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
             modules = listOf(
                 tailnet.koinModule,
                 translation.koinModule,
+                dataUse.koinModule,
                 module {
                     single<Context> { this@FeedFlowApp }
                     single<WebViewProfiles> { AndroidWebViewProfiles(this@FeedFlowApp) }

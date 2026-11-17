@@ -35,7 +35,11 @@ internal class ContentPrefetchRepositoryImpl(
                 )
                 logger.d { "Found ${immediateItems.size} items for immediate prefetch" }
                 for (item in immediateItems) {
-                    contentPrefetcher.prefetch(PrefetchQueueItem(feedItemId = item.feedItemId, url = item.url))
+                    // fork (Phase 4a): false means the app holds prefetching back; the rest is queued below.
+                    val fetched = contentPrefetcher.prefetch(
+                        PrefetchQueueItem(feedItemId = item.feedItemId, url = item.url),
+                    )
+                    if (!fetched) break
                 }
 
                 val queueItems = databaseHelper.getUnfetchedItems().map { item ->

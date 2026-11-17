@@ -9,16 +9,26 @@ internal class ContentPrefetcher(
     private val logger: Logger,
     private val databaseHelper: DatabaseHelper,
     private val readerContentFetcher: ReaderContentFetcher,
+    // fork (Phase 4a)
+    private val gate: ContentPrefetchGate? = null,
 ) {
     suspend fun prefetchQueuedBatch() {
         val queuedItems = databaseHelper.getNextPrefetchBatch()
         logger.d { "Processing ${queuedItems.size} queued items" }
         for (item in queuedItems) {
-            prefetch(item)
+            if (!prefetch(item)) break
         }
     }
 
-    suspend fun prefetch(item: PrefetchQueueItem) {
+    /**
+     * @return false when the app holds prefetching back (fork, Phase 4a): nothing was fetched and
+     *   the item is still queued and unfetched
+     */
+    suspend fun prefetch(item: PrefetchQueueItem): Boolean {
+        if (gate?.allowsPrefetch() == false) {
+            logger.i { "Prefetch held: not allowed on this connection" }
+            return false
+        }
         logger.d { "Prefetching: ${item.feedItemId}" }
         val content = readerContentFetcher.fetch(item.feedItemId, item.url, save = true)
         if (content != null) {
@@ -29,5 +39,6 @@ internal class ContentPrefetcher(
         // Failed items are marked as fetched too: prefetch is best-effort.
         databaseHelper.updateContentFetchedStatus(item.feedItemId, fetched = true)
         databaseHelper.removePrefetchQueueItem(item.feedItemId)
+        return true
     }
 }

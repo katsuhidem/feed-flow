@@ -218,6 +218,8 @@ internal actual fun getPlatformModule(appEnvironment: AppEnvironment): Module = 
         WorkManagerBackgroundPrefetchScheduler(
             appContext = get(),
             logger = getWith("WorkManagerBackgroundPrefetchScheduler"),
+            // fork (Phase 4a)
+            gate = getOrNull(),
         )
     }
 

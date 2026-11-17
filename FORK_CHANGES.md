@@ -22,15 +22,15 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TranslationSetup` を作り、Koin モジュールを渡し、起動後に `install()` | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/home/components/list/FeedItemCommon.kt` | 訳題があれば主に表示し、原題を下に小さく表示(`OriginalTitle`) | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreenContent.kt` | `footerContent` 引数を追加 | 2 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す | 2 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す。Phase 4a: 通信量の設定の欄も同じ枠に渡す | 2、4a |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/feed/editfeed/EditFeedComponents.kt` | `EditFeedContent` に `extraSettings` 引数を追加 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/editfeed/EditFeedScreen.android.kt` | `EditScreen` に `feedId` 引数を追加し、フィード別の翻訳設定を表示 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/MainActivity.kt` | `EditScreen` に `feedId` を渡す | 2 |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/ReaderModeHtmlAndCss.kt` | 翻訳用の CSS と JavaScript を読み込む2か所(`readerTranslationCss()`、`readerTranslationJs()`) | 3 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行 | 3。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える | 3 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeToolbar.kt` | `actions` 引数を追加 | 3 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す | 1。Phase 4a: 通信量の制御の組み立て(`DataUseSetup`)を起動時に作る1行 |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す。Phase 4a: 通信量の制御の組み立て(`DataUseSetup`)を起動時に作る1行 | 1、4a |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/utils/ImageLoader.kt` | `coilImageLoader` に `okHttpClient` 引数を追加し、`OkHttpNetworkFetcherFactory` で使う | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/accounts/freshrss/FreshRssSyncScreen.android.kt` | Tailscale の欄を表示し、ログイン時に入力された URL を tailnet の対象にする | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/accounts/freshrss/FreshRssSyncComponents.kt` | `FreshRssSyncContent` に `headerContent` 引数を追加 | 1 |
@@ -38,6 +38,10 @@
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `initKoin` と `getAllModulesModules` に `greaderHttpEngine` 引数を追加 | 1 |
 | `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/domain/FeedDownloadWorker.kt` | `syncNetworkGate` 引数を追加し、取得を `withNetwork` で包む | 1 |
 | `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/di/KoinAndroid.kt` | `FeedDownloadWorker` に `getOrNull<SyncNetworkGate>()` を渡す | 1 |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/ContentPrefetcher.kt` | Phase 4a: 各記事の取得の直前に `ContentPrefetchGate` を確かめる。止められたら取得せず、待ち行列に残したまま `false` を返す(`prefetch` の戻り値を `Boolean` にした) | 4a |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/ContentPrefetchRepositoryImpl.kt` | Phase 4a: 同期直後の取得で、止められたら残りを試さずに待ち行列へ回す | 4a |
+| `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/WorkManagerBackgroundPrefetchScheduler.kt` | Phase 4a: 「Wi-Fi のときだけ」がオンなら、WorkManager の条件を「従量制でない回線」にする | 4a |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt`、`shared/src/androidMain/kotlin/com/prof18/feedflow/shared/di/KoinAndroid.kt` | Phase 4a: 先読みの部品に `ContentPrefetchGate` を渡す(`getOrNull()`、1行ずつ) | 4a |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 

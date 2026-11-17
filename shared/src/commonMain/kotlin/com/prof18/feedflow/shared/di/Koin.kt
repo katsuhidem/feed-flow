@@ -268,6 +268,8 @@ private fun getCoreModule(appConfig: AppConfig) = module {
             logger = getWith("ContentPrefetcher"),
             databaseHelper = get(),
             readerContentFetcher = get(),
+            // fork (Phase 4a)
+            gate = getOrNull(),
         )
     }
 
