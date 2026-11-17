@@ -34,11 +34,14 @@ fun coilImageLoader(
     debug: Boolean,
     // fork: client with the tailnet setup, so feed icons on the FreshRSS host load through the proxy
     okHttpClient: OkHttpClient? = null,
+    // fork (Phase 4a): keeps requests off the network while images are held back on mobile connections
+    extraInterceptor: Interceptor? = null,
 ): ImageLoader {
     return ImageLoader.Builder(context)
         .components {
             if (okHttpClient != null) add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
             add(imageAcceptHeaderInterceptor)
+            if (extraInterceptor != null) add(extraInterceptor)
             add(SvgDecoder.Factory())
         }
         .memoryCache {

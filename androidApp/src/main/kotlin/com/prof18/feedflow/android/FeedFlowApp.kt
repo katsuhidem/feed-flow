@@ -243,6 +243,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
             context = this@FeedFlowApp,
             debug = appEnvironment.isDebug(),
             okHttpClient = tailnet.okHttpClient,
+            extraInterceptor = dataUse.imageInterceptor,
         )
     }
 }

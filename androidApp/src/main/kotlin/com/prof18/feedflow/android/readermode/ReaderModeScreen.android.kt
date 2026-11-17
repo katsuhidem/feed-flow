@@ -1,6 +1,10 @@
 package com.prof18.feedflow.android.readermode
 
 import com.prof18.feedflow.android.translation.ArticleTranslationViewModel
+import com.prof18.feedflow.android.datause.DataUseSetup
+import com.prof18.feedflow.android.datause.LoadImagesButton
+import com.prof18.feedflow.android.datause.applyMediaBlock
+import com.prof18.feedflow.android.datause.rememberReaderMediaBlock
 import com.prof18.feedflow.android.translation.ArticleTranslationButton
 import com.prof18.feedflow.android.translation.TranslationDebug
 import android.webkit.CookieManager
@@ -163,6 +167,16 @@ internal fun ReaderModeScreen(
     val fontScriptScope = rememberCoroutineScope()
     val fontScriptJob = remember { mutableStateOf<Job?>(null) }
     val showingFallbackWebsite = readerModeState.showsFallbackWebsite(verificationState)
+    // fork (Phase 4a): images and video are held back on mobile connections until the user asks for them
+    val dataUse = koinInject<DataUseSetup>()
+    val mediaBlock = rememberReaderMediaBlock(
+        setup = dataUse,
+        articleKey = when (readerModeState) {
+            is ReaderModeState.Success -> readerModeState.readerModeData.id.id
+            is ReaderModeState.ContentNotAvailable -> readerModeState.url.takeIf { showingFallbackWebsite }
+            else -> null
+        },
+    )
     var fullscreenImageUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
     val toolbarHeightPx = remember { MutableStateFlow(0) }
@@ -189,6 +203,7 @@ internal fun ReaderModeScreen(
                     isDetailFullscreen = isDetailFullscreen,
                     onToggleDetailFullscreen = onToggleDetailFullscreen,
                     actions = {
+                        if (mediaBlock.blocked) LoadImagesButton(mediaBlock.load)
                         if (readerModeState is ReaderModeState.Success && !showingFallbackWebsite) {
                             ArticleTranslationButton(translationUi, translationViewModel::onButtonClick)
                         }
@@ -317,6 +332,7 @@ internal fun ReaderModeScreen(
                         ReaderFallbackContent(
                             url = readerModeState.url,
                             showingFallbackWebsite = showingFallbackWebsite,
+                            mediaBlocked = mediaBlock.blocked,
                             hasAudioPlayer = audioState.episode != null,
                             toolbarHeightPx = toolbarHeightPx,
                             contentPadding = contentPadding,
@@ -348,6 +364,7 @@ internal fun ReaderModeScreen(
                             bodyFont = bodyFont,
                             readerModeState = readerModeState,
                             translation = translationViewModel,
+                            mediaBlocked = mediaBlock.blocked,
                             openInBrowser = { url ->
                                 if (isValidUrl(url)) {
                                     browserManager.openUrlWithFavoriteBrowser(url, context)
@@ -355,6 +372,8 @@ internal fun ReaderModeScreen(
                             },
                             onImageClick = { imageUrl ->
                                 if (imageUrl.isNotBlank()) {
+                                    // fork (Phase 4a): an image opened by hand loads on any connection
+                                    dataUse.allowImage(imageUrl)
                                     fullscreenImageUrl = imageUrl
                                 }
                             },
@@ -495,6 +514,7 @@ private fun ReaderContentUnavailable(modifier: Modifier = Modifier) {
 private fun ReaderFallbackContent(
     url: String,
     showingFallbackWebsite: Boolean,
+    mediaBlocked: Boolean,
     hasAudioPlayer: Boolean,
     toolbarHeightPx: StateFlow<Int>,
     contentPadding: PaddingValues,
@@ -519,6 +539,7 @@ private fun ReaderFallbackContent(
         )
         else -> FallbackWebView(
             url = url,
+            mediaBlocked = mediaBlocked,
             hasAudioPlayer = hasAudioPlayer,
             toolbarHeightPx = toolbarHeightPx,
             contentPadding = contentPadding,
@@ -566,6 +587,7 @@ private fun ReaderOpenedExternally(
 @Composable
 private fun FallbackWebView(
     url: String,
+    mediaBlocked: Boolean,
     hasAudioPlayer: Boolean,
     toolbarHeightPx: StateFlow<Int>,
     contentPadding: PaddingValues,
@@ -582,6 +604,10 @@ private fun FallbackWebView(
         0.dp
     }
     var showPageLoader by remember { mutableStateOf(true) }
+    // fork (Phase 4a): the page itself comes from the network, so only its images are held back
+    var nativeWebView by remember { mutableStateOf<android.webkit.WebView?>(null) }
+    val latestMediaBlocked by rememberUpdatedState(mediaBlocked)
+    SideEffect { nativeWebView?.applyMediaBlock(mediaBlocked, localPage = false) }
 
     SideEffect(url) {
         showPageLoader = true
@@ -601,6 +627,8 @@ private fun FallbackWebView(
             navigator = navigator,
             platformWebViewParams = PlatformWebViewParams(chromeClient = rememberFullscreenVideoChromeClient()),
             onCreated = { webView ->
+                webView.applyMediaBlock(latestMediaBlocked, localPage = false)
+                nativeWebView = webView
                 webView.setDownloadListener { downloadUrl, _, _, _, _ ->
                     latestOnDownloadRequested(downloadUrl)
                 }
@@ -642,6 +670,8 @@ private fun ReaderMode(
     modifier: Modifier = Modifier,
     // fork (Phase 3)
     translation: ArticleTranslationViewModel? = null,
+    // fork (Phase 4a)
+    mediaBlocked: Boolean = false,
 ) {
     val bodyColor = MaterialTheme.colorScheme.onSurface.toArgb().toHexString().substring(2)
     val linkColor = MaterialTheme.colorScheme.primary.toArgb().toHexString().substring(2)
@@ -790,6 +820,13 @@ private fun ReaderMode(
         )
     }
 
+    // fork (Phase 4a): reader mode gets its page as text, so every network load is an image, a video
+    // or an embed. The side effect runs before the WebView takes a new article, and again when the
+    // user asks for the images.
+    var nativeWebView by remember { mutableStateOf<android.webkit.WebView?>(null) }
+    val latestMediaBlocked by rememberUpdatedState(mediaBlocked)
+    SideEffect { nativeWebView?.applyMediaBlock(mediaBlocked, localPage = true) }
+
     val state = rememberWebViewStateWithHTMLData(
         data = content,
         baseUrl = readerModeState.readerModeData.baseUrl,
@@ -861,6 +898,9 @@ private fun ReaderMode(
             captureBackPresses = false,
             platformWebViewParams = PlatformWebViewParams(chromeClient = rememberFullscreenVideoChromeClient()),
             onCreated = { webView ->
+                // fork (Phase 4a): set before the article is handed to the WebView
+                webView.applyMediaBlock(latestMediaBlocked, localPage = true)
+                nativeWebView = webView
                 CookieManager.getInstance().setAcceptCookie(true)
                 CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
                 webView.isVerticalScrollBarEnabled = false

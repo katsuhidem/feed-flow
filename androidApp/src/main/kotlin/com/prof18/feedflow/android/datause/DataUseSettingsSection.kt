@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.prof18.feedflow.android.BuildConfig
 
 /**
  * fork (Phase 4a): data use settings, shown at the end of the reading
@@ -43,5 +44,28 @@ internal fun DataUseSettingsSection(setup: DataUseSetup, modifier: Modifier = Mo
                 "モバイル回線で止めた分は、Wi-Fi につながったときに取得します。",
             style = MaterialTheme.typography.bodySmall,
         )
+
+        val blockMedia by setup.prefs.blockMediaOnMobile.collectAsStateWithLifecycle()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "モバイル回線では画像と動画を読み込まない", modifier = Modifier.weight(1f))
+            Switch(checked = blockMedia, onCheckedChange = { setup.prefs.setBlockMediaOnMobile(it) })
+        }
+        Text(
+            text = "一覧では、すでに端末に保存されている画像だけを表示します。" +
+                "リーダーモードでは、ツールバーの「画像を読み込む」を押した記事だけ読み込みます。",
+            style = MaterialTheme.typography.bodySmall,
+        )
+
+        if (BuildConfig.DEBUG) {
+            val treatAsMobile by setup.prefs.debugTreatAsMobile.collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "検証用: いまの回線をモバイル回線として扱う",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = treatAsMobile, onCheckedChange = { setup.prefs.setDebugTreatAsMobile(it) })
+            }
+        }
     }
 }
