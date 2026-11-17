@@ -1,0 +1,6 @@
+-- fork (Phase 4e): articles for the duplicate check. rowid tells the order in which articles
+-- were inserted (articles are inserted with INSERT OR IGNORE, so an article keeps its rowid).
+selectForDuplicateRead:
+SELECT feed_item.rowid AS row_id, url_hash, url, is_read, pub_date
+FROM feed_item
+WHERE url <> '';

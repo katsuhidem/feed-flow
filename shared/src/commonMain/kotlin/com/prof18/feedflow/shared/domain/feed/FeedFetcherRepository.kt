@@ -3,6 +3,7 @@ package com.prof18.feedflow.shared.domain.feed
 import co.touchlab.kermit.Logger
 import com.prof18.feedflow.core.domain.DateFormatter
 import com.prof18.feedflow.core.domain.FeedSourceLogoRetriever
+import com.prof18.feedflow.core.model.isSuccess
 import com.prof18.feedflow.core.model.AutoDeletePeriod
 import com.prof18.feedflow.core.model.Failure
 import com.prof18.feedflow.core.model.FeedFilter
@@ -73,6 +74,8 @@ class FeedFetcherRepository internal constructor(
     private val feedHttpCacheStore: FeedHttpCacheStore,
     private val feedAttempt: FeedAttempt,
     private val recoveryRepository: FeedRecoveryRepository,
+    // fork (Phase 4e): marks duplicate articles as read after a sync
+    private val duplicateReadMarker: DuplicateReadMarker? = null,
 ) {
     private val fetchMutex = Mutex()
     private val feedToUpdate = hashSetOf<String>()
@@ -130,10 +133,12 @@ class FeedFetcherRepository internal constructor(
         if (feedSourceUrls.isEmpty()) {
             feedStateRepository.emitUpdateStatus(NoFeedSourcesStatus)
         } else {
-            gReaderRepository.sync()
-                .onErrorSuspend { failure ->
-                    feedStateRepository.emitErrorState(SyncError(failure.toGReaderSyncErrorCode()))
-                }
+            val syncResult = gReaderRepository.sync()
+            syncResult.onErrorSuspend { failure ->
+                feedStateRepository.emitErrorState(SyncError(failure.toGReaderSyncErrorCode()))
+            }
+            // fork (Phase 4e): only after a complete sync, when the read states match the server
+            if (syncResult.isSuccess()) duplicateReadMarker?.afterSync()
         }
         // If the sync is skipped quickly, sometimes the loading spinner stays out
         delay(50.milliseconds)
@@ -203,6 +208,8 @@ class FeedFetcherRepository internal constructor(
         )
 
         feedSyncRepository.syncFeedItems()
+        // fork (Phase 4e)
+        duplicateReadMarker?.afterSync()
         // If the sync is skipped quickly, sometimes the loading spinner stays out
         delay(50.milliseconds)
         contentPrefetchRepository.prefetchContent()

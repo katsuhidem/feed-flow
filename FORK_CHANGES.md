@@ -22,7 +22,7 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TranslationSetup` を作り、Koin モジュールを渡し、起動後に `install()` | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/home/components/list/FeedItemCommon.kt` | 訳題があれば主に表示し、原題を下に小さく表示(`OriginalTitle`) | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreenContent.kt` | `footerContent` 引数を追加 | 2 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す。Phase 4a: 通信量の設定の欄も同じ枠に渡す | 2、4a |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/readingbehavior/ReadingBehaviorScreen.kt` | 翻訳の設定の欄を `footerContent` に渡す。Phase 4a: 通信量の設定の欄も同じ枠に渡す。Phase 4e: 重複した記事の設定の欄も同じ枠に渡す | 2、4a、4e |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/feed/editfeed/EditFeedComponents.kt` | `EditFeedContent` に `extraSettings` 引数を追加 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/editfeed/EditFeedScreen.android.kt` | `EditScreen` に `feedId` 引数を追加し、フィード別の翻訳設定を表示 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/MainActivity.kt` | `EditScreen` に `feedId` を渡す | 2 |
@@ -45,6 +45,9 @@
 | `i18n/src/commonMain/resources/locale/values-ja/strings.xml` | Phase 4b: 上流に無い日本語の訳 341 件を、末尾に注釈付きでまとめて足した(英語のファイルの順)。上流の翻訳の更新を cherry-pick して同じ名前が増えたら、どちらか一方を残す | 4b |
 | `i18n/build.gradle.kts` | Phase 4b: 文字列を生成する KSP の処理に、言語ファイルのフォルダを入力として登録した(登録しないと、言語ファイルを変えても生成し直されない) | 4b |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeFloatingToolbar.kt` | Phase 4c: 「記事を読み上げる」と「壊れた記事を報告」のボタンを並べる行を外した(処理そのものは残っている)。Phase 4d: 「Notionに保存」のボタン(引数 `onShareToNotion` を渡したときだけ出す) | 4c、4d |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/FeedFetcherRepository.kt` | Phase 4e: 引数 `duplicateReadMarker` を足し、同期の後(FreshRSS は同期が成功したときだけ)に重複の判定を呼ぶ | 4e |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | Phase 4e: `DuplicateReadMarker` を登録し、`FeedFetcherRepository` に渡す | 4e |
+| `database/src/commonMain/kotlin/com/prof18/feedflow/database/DatabaseHelper.kt` | Phase 4e: 重複の判定に使う記事の一覧を読むメソッド `getDuplicateReadRows` | 4e |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 

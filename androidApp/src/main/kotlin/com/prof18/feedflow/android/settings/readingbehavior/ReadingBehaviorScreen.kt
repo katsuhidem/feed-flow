@@ -2,6 +2,8 @@ package com.prof18.feedflow.android.settings.readingbehavior
 
 import androidx.compose.foundation.layout.Column
 import com.prof18.feedflow.android.datause.DataUseSettingsSection
+import com.prof18.feedflow.android.duplicates.DuplicateReadSettingsSection
+import com.prof18.feedflow.shared.domain.feed.DuplicateReadMarker
 import com.prof18.feedflow.android.datause.DataUseSetup
 import com.prof18.feedflow.android.translation.TranslationSettingsSection
 import com.prof18.feedflow.android.translation.TranslationSetup
@@ -28,11 +30,13 @@ internal fun ReadingBehaviorScreen(
 
     val translation = koinInject<TranslationSetup>()
     val dataUse = koinInject<DataUseSetup>()
+    val duplicateRead = koinInject<DuplicateReadMarker>()
 
     ReadingBehaviorScreenContent(
         navigateBack = navigateBack,
         footerContent = {
             Column {
+                DuplicateReadSettingsSection(duplicateRead)
                 TranslationSettingsSection(translation)
                 DataUseSettingsSection(dataUse)
             }

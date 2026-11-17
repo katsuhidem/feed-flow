@@ -34,6 +34,7 @@ import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetchReposito
 import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetchRepositoryImpl
 import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetcher
 import com.prof18.feedflow.shared.domain.feed.ArticleNavigationRepository
+import com.prof18.feedflow.shared.domain.feed.DuplicateReadMarker
 import com.prof18.feedflow.shared.domain.feed.FeedActionsRepository
 import com.prof18.feedflow.shared.domain.feed.FeedFetcherRepository
 import com.prof18.feedflow.shared.domain.feed.FeedFontSizeRepository
@@ -226,6 +227,17 @@ private fun getCoreModule(appConfig: AppConfig) = module {
             feedStateRepository = get(),
             readerContentFetcher = get(),
             feedItemContentFileHandler = get(),
+        )
+    }
+
+    // fork (Phase 4e)
+    single {
+        val scope = this
+        DuplicateReadMarker(
+            databaseHelper = get(),
+            settings = get(),
+            logger = getWith("DuplicateRead"),
+            markAsRead = { ids -> scope.get<FeedActionsRepository>().markAsRead(HashSet(ids)) },
         )
     }
 
@@ -751,6 +763,8 @@ private fun getCoreModule(appConfig: AppConfig) = module {
             feedHttpCacheStore = get(),
             feedAttempt = get(),
             recoveryRepository = get(),
+            // fork (Phase 4e)
+            duplicateReadMarker = getOrNull(),
         )
     }
 
