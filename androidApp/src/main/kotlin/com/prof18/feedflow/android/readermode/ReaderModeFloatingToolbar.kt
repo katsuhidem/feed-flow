@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -142,6 +143,8 @@ fun ReaderModeFloatingToolbar(
     onReportArticle: () -> Unit,
     modifier: Modifier = Modifier,
     audioContent: (@Composable () -> Unit)? = null,
+    // fork (Phase 4d): shown next to "share" when given
+    onShareToNotion: ((String, String?) -> Unit)? = null,
 ) {
     var showFontSizeMenu by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
@@ -183,7 +186,9 @@ fun ReaderModeFloatingToolbar(
 
     // Build action lists regardless of isContentVisible so AnimatedVisibility can animate exit
     // Order: Browser, Share | < > | Bookmark, Comments, Archive, Text Settings, RSS Content
-    val leadingActions = remember(readerModeState, strings, url) {
+    val latestOnShareToNotion by rememberUpdatedState(onShareToNotion)
+    val hasNotion = onShareToNotion != null
+    val leadingActions = remember(readerModeState, strings, url, hasNotion) {
         buildList {
             if (readerModeState !is ReaderModeState.Loading && url != null) {
                 add(
@@ -204,6 +209,18 @@ fun ReaderModeFloatingToolbar(
                         },
                     ),
                 )
+                if (hasNotion) {
+                    add(
+                        ToolbarAction(
+                            icon = Icons.Outlined.NoteAdd,
+                            label = "Notionに保存",
+                            onClick = {
+                                val title = (readerModeState as? ReaderModeState.Success)?.readerModeData?.title
+                                latestOnShareToNotion?.invoke(url, title)
+                            },
+                        ),
+                    )
+                }
             }
         }
             .toImmutableList()

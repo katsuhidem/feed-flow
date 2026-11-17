@@ -9,7 +9,7 @@
 | `.github/workflows/`(12ファイル)、`renovate.json` | 削除。上流のCI、リリース、依存更新の自動化はこのフォークでは使わない | 0a |
 | `settings.gradle.kts` | `:benchmarks` と `:desktopApp` の `include` を外した | 0a |
 | `androidApp/build.gradle.kts` | `applicationId` を `io.github.katsuhidem.feedflow` に変更。`"baselineProfile"(project(":benchmarks"))` を外した | 0a |
-| `androidApp/src/main/AndroidManifest.xml` | アプリ名(`android:label`)を `Tailfeed` に変更 | 0a |
+| `androidApp/src/main/AndroidManifest.xml` | アプリ名(`android:label`)を `Tailfeed` に変更。Phase 4d: `queries` に Notion アプリのパッケージ(`notion.id`)を足した | 0a、4d |
 | `androidApp/src/release/res/drawable/ic_launcher_background.xml` | 背景のグラデーションを青から緑系に変更 | 0a |
 | `androidApp/src/debug/res/drawable/ic_launcher_background.xml` | 背景のグラデーションを橙から紫系に変更 | 0a |
 | `.gitignore` | 0c の評価用の訳文(記事本文を含む)の出力先 `docs/spike/eval-out/` を除外 | 0c |
@@ -27,7 +27,7 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/editfeed/EditFeedScreen.android.kt` | `EditScreen` に `feedId` 引数を追加し、フィード別の翻訳設定を表示 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/MainActivity.kt` | `EditScreen` に `feedId` を渡す | 2 |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/ReaderModeHtmlAndCss.kt` | 翻訳用の CSS と JavaScript を読み込む2か所(`readerTranslationCss()`、`readerTranslationJs()`) | 3 |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える。Phase 4a: 画像と動画の読み込みの制御(`applyMediaBlock`)、ツールバーの「画像を読み込む」ボタン、画像ビューアで開く画像の許可 | 3、4a |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える。Phase 4a: 画像と動画の読み込みの制御(`applyMediaBlock`)、ツールバーの「画像を読み込む」ボタン、画像ビューアで開く画像の許可。Phase 4d: Notion アプリが入っているときに、ツールバーへ Notion への共有の処理を渡す | 3、4a、4d |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeToolbar.kt` | `actions` 引数を追加 | 3 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す。Phase 4a: 通信量の制御の組み立て(`DataUseSetup`)を起動時に作る1行、Koin モジュールと画像ローダー用のインターセプタ(`imageInterceptor`)を渡す | 1、4a |
@@ -44,7 +44,7 @@
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt`、`shared/src/androidMain/kotlin/com/prof18/feedflow/shared/di/KoinAndroid.kt` | Phase 4a: 先読みの部品に `ContentPrefetchGate` を渡す(`getOrNull()`、1行ずつ) | 4a |
 | `i18n/src/commonMain/resources/locale/values-ja/strings.xml` | Phase 4b: 上流に無い日本語の訳 341 件を、末尾に注釈付きでまとめて足した(英語のファイルの順)。上流の翻訳の更新を cherry-pick して同じ名前が増えたら、どちらか一方を残す | 4b |
 | `i18n/build.gradle.kts` | Phase 4b: 文字列を生成する KSP の処理に、言語ファイルのフォルダを入力として登録した(登録しないと、言語ファイルを変えても生成し直されない) | 4b |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeFloatingToolbar.kt` | Phase 4c: 「記事を読み上げる」と「壊れた記事を報告」のボタンを並べる行を外した(処理そのものは残っている) | 4c |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeFloatingToolbar.kt` | Phase 4c: 「記事を読み上げる」と「壊れた記事を報告」のボタンを並べる行を外した(処理そのものは残っている)。Phase 4d: 「Notionに保存」のボタン(引数 `onShareToNotion` を渡したときだけ出す) | 4c、4d |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 

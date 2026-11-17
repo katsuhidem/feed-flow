@@ -21,6 +21,8 @@
         <intent>
             <action android:name="android.support.customtabs.action.CustomTabsService"/>
         </intent>
+        <!-- fork (Phase 4d): the reader's "save to Notion" button sends to this app directly -->
+        <package android:name="notion.id"/>
     </queries>
 
     <application

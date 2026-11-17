@@ -2,6 +2,8 @@ package com.prof18.feedflow.android.readermode
 
 import com.prof18.feedflow.android.translation.ArticleTranslationViewModel
 import com.prof18.feedflow.android.datause.DataUseSetup
+import com.prof18.feedflow.android.notion.canShareToNotion
+import com.prof18.feedflow.android.notion.shareToNotion
 import com.prof18.feedflow.android.datause.LoadImagesButton
 import com.prof18.feedflow.android.datause.applyMediaBlock
 import com.prof18.feedflow.android.datause.rememberReaderMediaBlock
@@ -160,6 +162,8 @@ internal fun ReaderModeScreen(
     val context = LocalContext.current
     val strings = LocalFeedFlowStrings.current
     val audioUrlOpener = remember(context) { AudioUrlOpener(context::startActivity) }
+    // fork (Phase 4d): the "save to Notion" button appears only with the Notion app installed
+    val canShareToNotion = remember(context) { context.canShareToNotion() }
     val openAudioExternal: (String) -> Unit = { audioUrl ->
         audioPlayer.openExternal(context, audioUrlOpener, audioUrl, strings.audioOpenFailed)
     }
@@ -271,6 +275,12 @@ internal fun ReaderModeScreen(
                                 title = title,
                                 url = url,
                             )
+                        },
+                        // fork (Phase 4d)
+                        onShareToNotion = if (canShareToNotion) {
+                            { url, title -> context.shareToNotion(title, url) }
+                        } else {
+                            null
                         },
                         onArchiveClick = { articleUrl ->
                             val archiveUrl = getArchiveISUrl(articleUrl)
