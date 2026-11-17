@@ -10,6 +10,7 @@ import androidx.lifecycle.coroutineScope
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import com.prof18.feedflow.android.datause.DataUseSetup
 import com.prof18.feedflow.android.tailnet.TailnetSetup
 import com.prof18.feedflow.android.translation.TranslationSetup
 import com.prof18.feedflow.android.audio.AndroidAudioPlayer
@@ -72,6 +73,9 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
     // fork: on-device translation (Phase 2)
     private lateinit var translation: TranslationSetup
 
+    // fork: data use on mobile connections (Phase 4a)
+    private lateinit var dataUse: DataUseSetup
+
     override fun onCreate() {
         super.onCreate()
 
@@ -108,6 +112,7 @@ class FeedFlowApp : Application(), SingletonImageLoader.Factory {
 
         tailnet = TailnetSetup(this)
         translation = TranslationSetup(this)
+        dataUse = DataUseSetup(this)
 
         initKoin(
             appConfig = appConfig,
