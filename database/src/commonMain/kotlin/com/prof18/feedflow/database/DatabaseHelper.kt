@@ -111,6 +111,11 @@ class DatabaseHelper(
 
     private fun <T> Flow<T>.pausedInBackground(): Flow<T> = liveQueryGate.whileOpen(this)
 
+    // fork (Phase 4h)
+    suspend fun getFeedSourceIdOf(urlHash: String): String? = withContext(backgroundDispatcher) {
+        dbRef.forkArticleFeedQueries.selectFeedSourceIdOf(urlHash).executeAsOneOrNull()
+    }
+
     // fork (Phase 4e)
     suspend fun getDuplicateReadRows(): List<DuplicateReadRow> = withContext(backgroundDispatcher) {
         dbRef.forkDuplicateReadQueries.selectForDuplicateRead().executeAsList().map {

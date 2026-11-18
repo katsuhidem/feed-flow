@@ -47,7 +47,7 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeFloatingToolbar.kt` | Phase 4c: 「記事を読み上げる」と「壊れた記事を報告」のボタンを並べる行を外した(処理そのものは残っている)。Phase 4d: 「Notionに保存」のボタン(引数 `onShareToNotion` を渡したときだけ出す) | 4c、4d |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/FeedFetcherRepository.kt` | Phase 4e: 引数 `duplicateReadMarker` を足し、同期の後(FreshRSS は同期が成功したときだけ)に重複の判定を呼ぶ | 4e |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | Phase 4e: `DuplicateReadMarker` を登録し、`FeedFetcherRepository` に渡す | 4e |
-| `database/src/commonMain/kotlin/com/prof18/feedflow/database/DatabaseHelper.kt` | Phase 4e: 重複の判定に使う記事の一覧を読むメソッド `getDuplicateReadRows` | 4e |
+| `database/src/commonMain/kotlin/com/prof18/feedflow/database/DatabaseHelper.kt` | Phase 4e: 重複の判定に使う記事の一覧を読むメソッド `getDuplicateReadRows`。Phase 4h: 記事のフィードを引くメソッド `getFeedSourceIdOf` | 4e、4h |
 | `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/DateFormat.kt` | Phase 4g: 日付表記の選択肢に `JAPANESE` を足した | 4g |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/DateFormatterImpl.kt` | Phase 4g: 日本式の組み立て(「11/16 15:35」「2025/7/8 19:30」)。「最後の同期」を年が先の「2026/11/16 21:33:06」の形にした(全員に効く) | 4g |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/feedlist/FeedListSettingsScreenContent.kt` | Phase 4g: 日付表記の選択肢に「日本式(11/16)」 | 4g |

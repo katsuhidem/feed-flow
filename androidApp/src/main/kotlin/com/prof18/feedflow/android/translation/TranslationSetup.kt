@@ -1,5 +1,7 @@
 package com.prof18.feedflow.android.translation
 
+import com.prof18.feedflow.database.DatabaseHelper
+import org.koin.mp.KoinPlatform
 import android.app.Application
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
@@ -150,6 +152,10 @@ class TranslationSetup(private val app: Application) {
     }
 
     fun recordTitles(items: Collection<io.github.katsuhidem.translation.TitleItem>) = titles.record(items)
+
+    /** fork (Phase 4h): the feed of an article, for its title translation in reader mode. */
+    suspend fun feedIdOf(urlHash: String): String? =
+        KoinPlatform.getKoin().get<DatabaseHelper>().getFeedSourceIdOf(urlHash)
 
     /** Queues the batch job; it runs while the device is charging. A job already queued is kept. */
     fun scheduleBatch() {

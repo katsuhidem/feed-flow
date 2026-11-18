@@ -1,0 +1,3 @@
+-- fork (Phase 4h): the feed of an article, for its title translation in reader mode.
+selectFeedSourceIdOf:
+SELECT feed_source_id FROM feed_item WHERE url_hash = ?;

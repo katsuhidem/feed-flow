@@ -1,5 +1,8 @@
 package com.prof18.feedflow.android.translation
 
+import kotlinx.coroutines.awaitAll
+import io.github.katsuhidem.translation.TranslationQueue.Priority
+import io.github.katsuhidem.translation.TitleItem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
@@ -71,6 +74,10 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
     private var session: ArticleSession? = null
     private var job: Job? = null
 
+    /** fork (Phase 4h): the block of the page that is the article title, when the page has one. */
+    private var titleBlockId: Int? = null
+    private val titleOwner = Any()
+
     /**
      * True while the user wants this article translated: from a press of
      * "translate" or "retry" until they stop the run or leave the reader.
@@ -86,6 +93,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
         this.title = title
         this.languageTag = languageTag
         if (articleId == this.articleId) return
+        titleBlockId = null
         this.articleId = articleId
         stopRun()
         session = null
@@ -183,6 +191,7 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                 )
             }
             session = setup.articleTranslator.open(id, title, blocks, languageTag)
+            titleBlockId = blocks.firstOrNull()?.takeIf { sameText(it.text, title) }?.id
             startRun(retryFailed = false, cachedOnly = !active)
         } catch (e: Exception) {
             log.w(e) { "could not read the page's blocks" }
@@ -249,6 +258,11 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                 } else {
                     ArticleTranslationUi.Finished(summary.canRetry || summary.modelMissing, summary.modelMissing)
                 }
+                // fork (Phase 4h): on opening, show the title translation of the article list
+                val titleBlock = titleBlockId
+                if (cachedOnly && titleBlock != null && current.states.value[titleBlock] != BlockState.DONE) {
+                    showListTitleTranslation(titleBlock, s, r)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -258,6 +272,38 @@ class ArticleTranslationViewModel(private val setup: TranslationSetup) : ViewMod
                 progress.cancel()
             }
         }
+    }
+
+    /**
+     * fork (Phase 4h): puts the title translation used in the article list under the title,
+     * translating the title first when it has none yet. Same decision as the list (feed setting,
+     * feed language), and the same cache keys, so no language tag is passed (the list passes none).
+     */
+    private suspend fun showListTitleTranslation(blockId: Int, s: String, r: String) {
+        val id = articleId ?: return
+        val text = title?.takeIf { it.isNotBlank() } ?: return
+        if (!setup.prefs.enabled.value) return
+        val feedId = setup.feedIdOf(id) ?: return
+        val item = TitleItem(urlHash = id, title = text, feedId = feedId)
+        var translated = setup.titleTranslator.lookup(listOf(item))[id]
+        val from = if (translated != null) "cache" else "translated"
+        if (translated == null) {
+            val pending = setup.titleTranslator.request(listOf(item), owner = titleOwner, priority = Priority.VISIBLE)
+            if (pending.isEmpty()) {
+                log.d { "title: nothing to show (not translated for this feed or no model)" }
+                return
+            }
+            pending.awaitAll()
+            translated = setup.titleTranslator.lookup(listOf(item))[id]
+        }
+        if (translated == null || articleId != id) return
+        commands.trySend("window.feedflowTranslation.apply($s, $r, $blockId, ${JSONObject.quote(translated)}, false);")
+        log.i { "title shown from=$from" }
+    }
+
+    private fun sameText(a: String, b: String?): Boolean {
+        fun norm(x: String) = x.trim().split(Regex("\\s+")).joinToString(" ")
+        return b != null && norm(a) == norm(b)
     }
 
     /** Stops the running translation. Only this screen's requests are cancelled. */
