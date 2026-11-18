@@ -96,12 +96,14 @@ fun FeedItemPreview(
                             DateFormat.DAY_MONTH_DOT -> "25.12"
                             DateFormat.AMERICAN -> "12/25"
                             DateFormat.ISO -> "2025-12-25"
+                            // fork (Phase 4g)
+                            DateFormat.JAPANESE -> "12/25"
                         }
                         val timePart = when (timeFormat) {
                             TimeFormat.HOURS_24 -> "14:30"
                             TimeFormat.HOURS_12 -> "2:30 PM"
                         }
-                        "$datePart - $timePart"
+                        if (dateFormat == DateFormat.JAPANESE) "$datePart $timePart" else "$datePart - $timePart"
                     },
                     commentsUrl = null,
                     isRead = false,

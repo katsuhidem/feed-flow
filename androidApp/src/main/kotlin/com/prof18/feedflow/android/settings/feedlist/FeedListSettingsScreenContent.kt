@@ -228,6 +228,8 @@ internal fun FeedListSettingsScreenContent(
                             SettingDropdownOption(DateFormat.DAY_MONTH_DOT, strings.dateFormatDayMonthDot),
                             SettingDropdownOption(DateFormat.AMERICAN, strings.dateFormatAmerican),
                             SettingDropdownOption(DateFormat.ISO, strings.dateFormatIso),
+                            // fork (Phase 4g)
+                            SettingDropdownOption(DateFormat.JAPANESE, "日本式(11/16)"),
                         ),
                         onOptionSelected = onDateFormatSelected,
                     )

@@ -788,7 +788,21 @@ class DateFormatterImpl(
             isThisYear -> {
                 LocalDateTime.Format {
                     dayAndMonth(dateFormat)
-                    chars(" - ")
+                    // fork (Phase 4g): a space before the time in the Japanese format
+                    chars(if (dateFormat == DateFormat.JAPANESE) " " else " - ")
+                    hourAndMinute(timeFormat)
+                }
+            }
+
+            // fork (Phase 4g)
+            dateFormat == DateFormat.JAPANESE -> {
+                LocalDateTime.Format {
+                    year()
+                    char('/')
+                    monthNumber(Padding.NONE)
+                    char('/')
+                    day(Padding.NONE)
+                    char(' ')
                     hourAndMinute(timeFormat)
                 }
             }
@@ -815,13 +829,14 @@ class DateFormatterImpl(
         val instant = Instant.fromEpochMilliseconds(millis)
         val dateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
 
+        // fork (Phase 4g): year first, as written in Japanese
         val dateFormat = LocalDateTime.Format {
-            day()
+            year()
             char('/')
             monthNumber()
             char('/')
-            year()
-            chars(" - ")
+            day()
+            char(' ')
             hour()
             char(':')
             minute()
@@ -955,6 +970,13 @@ class DateFormatterImpl(
 
             DateFormat.ISO -> {
                 yearMonthDay()
+            }
+
+            // fork (Phase 4g)
+            DateFormat.JAPANESE -> {
+                monthNumber(Padding.NONE)
+                char('/')
+                day(Padding.NONE)
             }
         }
     }

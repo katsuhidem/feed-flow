@@ -256,4 +256,27 @@ class DateFormatterTest {
     }
 
     private fun Int.padded(): String = toString().padStart(2, '0')
+
+    // fork (Phase 4g)
+    @Test
+    fun `japanese format writes month and day without padding and a space before the time`() {
+        val timezone = TimeZone.currentSystemDefault()
+        val clock = FakeClock(LocalDateTime(2026, 11, 19, 10, 30).toInstant(timezone))
+        val formatter = DateFormatterImpl(logger = testLogger, clock = clock)
+        fun at(dateTime: LocalDateTime, timeFormat: TimeFormat = TimeFormat.HOURS_24) =
+            formatter.formatDateForFeed(dateTime.toInstant(timezone).toEpochMilliseconds(), DateFormat.JAPANESE, timeFormat)
+
+        assertEquals("08:05", at(LocalDateTime(2026, 11, 19, 8, 5)))
+        assertEquals("11/16 15:35", at(LocalDateTime(2026, 11, 16, 15, 35)))
+        assertEquals("7/8 09:30", at(LocalDateTime(2026, 7, 8, 9, 30)))
+        assertEquals("2025/7/8 19:30", at(LocalDateTime(2025, 7, 8, 19, 30)))
+        assertEquals("11/16 3:35 PM", at(LocalDateTime(2026, 11, 16, 15, 35), TimeFormat.HOURS_12))
+    }
+
+    @Test
+    fun `last refresh is written year first`() {
+        val timezone = TimeZone.currentSystemDefault()
+        val millis = LocalDateTime(2026, 11, 16, 21, 33, 6).toInstant(timezone).toEpochMilliseconds()
+        assertEquals("2026/11/16 21:33:06", dateFormatter.formatDateForLastRefresh(millis))
+    }
 }
