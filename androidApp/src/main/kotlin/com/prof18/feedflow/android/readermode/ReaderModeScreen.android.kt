@@ -355,6 +355,7 @@ internal fun ReaderModeScreen(
                     swipeState = swipeState,
                     neighbors = readerNeighbors,
                     contentPadding = contentPadding,
+                    text = ReaderPreviewText(fontSize = fontSize, lineHeightStep = lineHeight, titleFontSize = titleFontSize),
                     onNavigate = { next -> if (next) onNavigateToNext() else onNavigateToPrevious() },
                 ) {
                 when (readerModeState) {

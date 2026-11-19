@@ -4,13 +4,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,10 +42,12 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import co.touchlab.kermit.Logger
 import coil3.compose.AsyncImage
 import com.prof18.feedflow.shared.domain.feed.ArticlePreview
@@ -67,6 +73,16 @@ class ReaderSwipeState {
 private val log = Logger.withTag("ReaderSwipe")
 
 /**
+ * The reader's text settings, so a preview looks like the page it stands for. The page sizes
+ * are CSS pixels, which are dp in the WebView.
+ */
+internal data class ReaderPreviewText(
+    val fontSize: Int,
+    val lineHeightStep: Int,
+    val titleFontSize: Int,
+)
+
+/**
  * fork (Phase 4i): lays the open article and previews of the articles before and after it side
  * by side and moves them with the finger (docs/PLAN.md "Phase 4i"). The finger is watched before
  * the WebView sees it; once the drag is clearly sideways it is taken from the WebView.
@@ -84,6 +100,7 @@ internal fun ReaderSwipePager(
     swipeState: ReaderSwipeState,
     neighbors: ReaderNeighbors,
     contentPadding: PaddingValues,
+    text: ReaderPreviewText,
     onNavigate: (next: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -115,6 +132,8 @@ internal fun ReaderSwipePager(
     LaunchedEffect(target?.id, currentId, shownId, enabled) {
         if (target == null) return@LaunchedEffect
         if (currentId == target.id && (shownId == target.id || !enabled)) {
+            // A moment more, so the title translation and cached images are on the page too.
+            delay(SETTLE_MS)
             arriving = null
         } else {
             delay(ARRIVAL_TIMEOUT_MS)
@@ -202,78 +221,121 @@ internal fun ReaderSwipePager(
         Box(Modifier.fillMaxSize().graphicsLayer { translationX = offset.value }) { content() }
         val moved = offset.value != 0f
         previous?.takeIf { moved }?.let {
-            ArticlePreviewPage(it, contentPadding, Modifier.graphicsLayer { translationX = offset.value - width })
+            ArticlePreviewPage(it, contentPadding, text, Modifier.graphicsLayer { translationX = offset.value - width })
         }
         next?.takeIf { moved }?.let {
-            ArticlePreviewPage(it, contentPadding, Modifier.graphicsLayer { translationX = offset.value + width })
+            ArticlePreviewPage(it, contentPadding, text, Modifier.graphicsLayer { translationX = offset.value + width })
         }
-        arriving?.let { ArticlePreviewPage(it, contentPadding) }
+        arriving?.let { ArticlePreviewPage(it, contentPadding, text) }
     }
 }
 
-/** A stand-in for an article page: its title, feed, date, image and description. */
+/**
+ * A stand-in for an article page, laid out like the reader page (ReaderModeHtmlAndCss): the
+ * title, its translation, the feed name, the image and the description, in the same sizes.
+ */
 @Composable
-private fun ArticlePreviewPage(preview: ArticlePreview, contentPadding: PaddingValues, modifier: Modifier = Modifier) {
+private fun ArticlePreviewPage(
+    preview: ArticlePreview,
+    contentPadding: PaddingValues,
+    text: ReaderPreviewText,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    // CSS px are dp in the page; dp.toSp keeps them dp whatever the system font scale.
+    fun px(value: Float) = with(density) { value.dp.toSp() }
+    val body = text.fontSize.toFloat()
+    // The app's text styles add letter spacing; the page has none.
+    val bodyStyle = TextStyle(
+        fontSize = px(body),
+        lineHeight = px(body * (LINE_HEIGHT_BASE_TENTHS + text.lineHeightStep) / 10f),
+        letterSpacing = 0.sp,
+    )
+    val titleStyle = TextStyle(
+        fontSize = px(text.titleFontSize.toFloat()),
+        lineHeight = px(text.titleFontSize * 1.2f),
+        letterSpacing = 0.sp,
+        fontWeight = FontWeight.ExtraBold,
+    )
+    val layoutDirection = LocalLayoutDirection.current
+    // The page draws under the toolbar and starts with a spacer of the top padding minus 40dp
+    // (ReaderMode), then the body margin of 8px.
+    val top = (contentPadding.calculateTopPadding() - 40.dp).coerceAtLeast(0.dp) + 8.dp
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(contentPadding),
+            .padding(
+                start = contentPadding.calculateStartPadding(layoutDirection),
+                end = contentPadding.calculateEndPadding(layoutDirection),
+                top = top,
+            ),
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             modifier = Modifier
+                .padding(horizontal = 8.dp)
                 .widthIn(max = 700.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp),
         ) {
             Text(
                 text = preview.title.orEmpty(),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 5,
+                style = titleStyle,
+                maxLines = 6,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
             )
             preview.translatedTitle?.let {
+                // As the translation under the title in the page (.__ff_tr): a rule on the left, a quieter colour.
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = bodyStyle,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(bottom = with(density) { (body * 0.65f).dp })
+                        .drawBehind {
+                            drawRect(Color(0x8C808080), size = Size(3.dp.toPx(), size.height))
+                        }
+                        .padding(start = with(density) { (body * 0.7f).dp }),
                 )
             }
             Text(
-                text = listOfNotNull(preview.feedTitle, preview.dateString).joinToString("  "),
-                style = MaterialTheme.typography.labelLarge,
+                text = preview.feedTitle,
+                style = bodyStyle,
+                fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(vertical = with(density) { (body * 1.33f).dp }),
             )
             preview.imageUrl?.let {
+                // Images in the page keep their proportions at the full width.
                 AsyncImage(
                     model = it,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 300.dp)
                         .clip(RoundedCornerShape(7.dp)),
                 )
             }
             preview.summary?.let {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = bodyStyle,
                     maxLines = 14,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = with(density) { body.dp }),
                 )
             }
         }
     }
 }
 
+private const val LINE_HEIGHT_BASE_TENTHS = 15
 private const val EDGE_DP = 24
 private const val FLICK_MIN_DP = 40
 private const val FLICK_VELOCITY_DP = 800
@@ -285,3 +347,4 @@ private const val BACK_MS = 180
 private const val LONG_PRESS_MS = 400L
 private const val VERDICT_WAIT_MS = 150L
 private const val ARRIVAL_TIMEOUT_MS = 4_000L
+private const val SETTLE_MS = 250L
