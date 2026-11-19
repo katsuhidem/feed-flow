@@ -28,6 +28,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import co.touchlab.kermit.Logger
 import com.prof18.feedflow.android.home.drawer.AndroidDrawer
 import com.prof18.feedflow.android.ui.home.FeedListActions
 import com.prof18.feedflow.android.ui.home.FeedManagementActions
@@ -39,8 +42,8 @@ import com.prof18.feedflow.core.model.FeedOrder
 import com.prof18.feedflow.core.model.SwipeActionType.NONE
 import com.prof18.feedflow.shared.presentation.model.HomeDisplayState
 import com.prof18.feedflow.shared.presentation.model.HomeViewMenuState
-import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Suppress("MultipleEmitters")
 @Composable
@@ -134,11 +137,14 @@ fun AdaptiveHomeView(
     if (useDockedDrawer) {
         // The docked drawer is part of the layout rather than a surface on top, so Back leaves it
         // alone and only steps back from a filter.
+        // fork (Phase 4j): on Timeline, Back shows a hidden docked drawer first.
         HomeBackHandler(
-            isDrawerOpen = false,
+            isDrawerOpen = isDockedDrawerVisible,
             currentFeedFilter = displayState.currentFeedFilter,
             onCloseDrawer = {},
             onShowTimeline = { showTimeline() },
+            onOpenDrawer = { onDockedDrawerVisibilityChange(true) },
+            closesOnFilterBack = false,
         )
         Row(
             modifier = modifier.fillMaxSize(),
@@ -185,7 +191,15 @@ fun AdaptiveHomeView(
             currentFeedFilter = displayState.currentFeedFilter,
             onCloseDrawer = { scope.launch { drawerState.close() } },
             onShowTimeline = { showTimeline() },
+            onOpenDrawer = { scope.launch { drawerState.open() } },
         )
+        // fork (Phase 4j): Back with the drawer open on Timeline leaves the app; start closed next time.
+        LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+            if (drawerState.isOpenForBack) {
+                Logger.d { "HomeBack: drawer closed on leaving" }
+                scope.launch { drawerState.snapTo(DrawerValue.Closed) }
+            }
+        }
         ModalNavigationDrawer(
             modifier = modifier,
             drawerState = drawerState,

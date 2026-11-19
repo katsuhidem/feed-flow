@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
+import co.touchlab.kermit.Logger
 import com.prof18.feedflow.core.model.FeedFilter
 
 /**
@@ -13,6 +14,10 @@ import com.prof18.feedflow.core.model.FeedFilter
  *
  * The filter lives in shared state rather than on the navigation back stack, so without this
  * handler Back from a filter would skip straight past Timeline.
+ *
+ * fork (Phase 4j): on Timeline, Back opens the drawer first, and only Back with the drawer open
+ * leaves the app. A docked drawer ([closesOnFilterBack] false) is part of the layout, so on a
+ * filter Back goes to Timeline whether it is shown or not.
  */
 @Composable
 internal fun HomeBackHandler(
@@ -20,13 +25,24 @@ internal fun HomeBackHandler(
     currentFeedFilter: FeedFilter,
     onCloseDrawer: () -> Unit,
     onShowTimeline: () -> Unit,
+    onOpenDrawer: () -> Unit,
+    closesOnFilterBack: Boolean = true,
 ) {
     val isTimeline = currentFeedFilter is FeedFilter.Timeline
-    BackHandler(enabled = isDrawerOpen || !isTimeline) {
-        if (isDrawerOpen) {
-            onCloseDrawer()
-        } else {
-            onShowTimeline()
+    BackHandler(enabled = !(isTimeline && isDrawerOpen)) {
+        when {
+            isTimeline -> {
+                Logger.d { "HomeBack: open drawer" }
+                onOpenDrawer()
+            }
+            isDrawerOpen && closesOnFilterBack -> {
+                Logger.d { "HomeBack: close drawer" }
+                onCloseDrawer()
+            }
+            else -> {
+                Logger.d { "HomeBack: show timeline" }
+                onShowTimeline()
+            }
         }
     }
 }

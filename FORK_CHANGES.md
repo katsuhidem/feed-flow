@@ -55,6 +55,9 @@
 | `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/ReaderFontFamily.kt` | Phase 4i: 端末にあるフォントを使う選択肢 `NOTO_SANS_CJK_JP`(`deviceFontName`、`isDeviceFont`)。`isBundled` をファイルの有無で決めるようにした | 4i |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/readerfont/ReaderFontFaceCss.kt` | Phase 4i: 端末にあるフォントの `@font-face`(`src: local(...)`) | 4i |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/readermode/ReaderComposeFonts.kt` | Phase 4i: 端末にあるフォントのファイルを探して読む。太さに ExtraBold(見出しの 800)を足した | 4i |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/home/HomeBackHandler.kt` | Phase 4j: タイムラインで「戻る」をすると、先にメニューを開く。メニューが開いたタイムラインではシステムに任せる(HOME に戻る) | 4j |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/home/AdaptiveHomeView.kt` | Phase 4j: メニューを開く処理を渡す。アプリが隠れたときに重なるメニューを閉じる | 4j |
+| `androidApp/src/test/kotlin/com/prof18/feedflow/android/home/HomeBackHandlerTest.kt` | Phase 4j: 新しい動きに合わせて書き換えた | 4j |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/ArticleNavigationRepository.kt` | Phase 4i: リーダーを開いてから閉じるまで、開いた時点の一覧の並び(読む順)で前後の記事を決める。終わりの近くでは一覧の次のページを読み込んで足す。既読の記事を一覧に出さない設定で、同期などの読み込み直しの後に前後へ移れなくなる上流の問題を直す | 4i |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。

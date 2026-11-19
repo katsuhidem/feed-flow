@@ -34,13 +34,14 @@ class HomeBackHandlerTest {
     private var currentFeedFilter by mutableStateOf<FeedFilter>(FeedFilter.Timeline)
     private val events = mutableListOf<String>()
 
+    // fork (Phase 4j): on Timeline, the drawer opens first and Back with it open leaves the app.
     @Test
-    fun `back with the drawer open closes the drawer`() {
+    fun `back on the timeline with the drawer open is left to the system`() {
         setHandler(drawerOpen = true, filter = FeedFilter.Timeline)
 
         pressBack()
 
-        assertEquals(listOf("close drawer"), events)
+        assertEquals(listOf("system"), events)
     }
 
     @Test
@@ -62,27 +63,39 @@ class HomeBackHandlerTest {
     }
 
     @Test
-    fun `back on the timeline root is left to the system`() {
+    fun `back on the timeline root opens the drawer`() {
         setHandler(drawerOpen = false, filter = FeedFilter.Timeline)
 
         pressBack()
 
-        assertEquals(listOf("system"), events)
+        assertEquals(listOf("open drawer"), events)
     }
 
     @Test
-    fun `back after returning to the timeline is left to the system`() {
+    fun `back steps from a filter to the timeline, the drawer, then the system`() {
         setHandler(drawerOpen = false, filter = categoryFilter)
         pressBack()
 
         currentFeedFilter = FeedFilter.Timeline
         pressBack()
 
-        assertEquals(listOf("show timeline", "system"), events)
+        isDrawerOpen = true
+        pressBack()
+
+        assertEquals(listOf("show timeline", "open drawer", "system"), events)
     }
 
     @Test
-    fun `back while the drawer is still opening closes it`() {
+    fun `back from a filter with the docked drawer shown returns to the timeline`() {
+        setHandler(drawerOpen = true, filter = categoryFilter, docked = true)
+
+        pressBack()
+
+        assertEquals(listOf("show timeline"), events)
+    }
+
+    @Test
+    fun `back while the drawer is still opening over a filter closes it`() {
         lateinit var drawerState: DrawerState
         lateinit var scope: CoroutineScope
         compose.setContent {
@@ -95,9 +108,10 @@ class HomeBackHandlerTest {
             ) {
                 HomeBackHandler(
                     isDrawerOpen = drawerState.isOpenForBack,
-                    currentFeedFilter = FeedFilter.Timeline,
+                    currentFeedFilter = categoryFilter,
                     onCloseDrawer = { events.add("close drawer") },
                     onShowTimeline = { events.add("show timeline") },
+                    onOpenDrawer = { events.add("open drawer") },
                 )
             }
         }
@@ -115,7 +129,7 @@ class HomeBackHandlerTest {
         assertEquals(listOf("close drawer"), events)
     }
 
-    private fun setHandler(drawerOpen: Boolean, filter: FeedFilter) {
+    private fun setHandler(drawerOpen: Boolean, filter: FeedFilter, docked: Boolean = false) {
         isDrawerOpen = drawerOpen
         currentFeedFilter = filter
         compose.setContent {
@@ -126,6 +140,8 @@ class HomeBackHandlerTest {
                 currentFeedFilter = currentFeedFilter,
                 onCloseDrawer = { events.add("close drawer") },
                 onShowTimeline = { events.add("show timeline") },
+                onOpenDrawer = { events.add("open drawer") },
+                closesOnFilterBack = !docked,
             )
         }
     }
