@@ -26,26 +26,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,9 +56,10 @@ import co.touchlab.kermit.Logger
 import coil3.compose.AsyncImage
 import com.prof18.feedflow.shared.domain.feed.ArticlePreview
 import com.prof18.feedflow.shared.domain.feed.ReaderNeighbors
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /**
  * fork (Phase 4i): what the reader page says about the finger it has just seen. The page's
@@ -252,12 +256,14 @@ private fun ArticlePreviewPage(
     // The app's text styles add letter spacing; the page has none. The fonts are the reader's: with
     // the system font, both draw Japanese with Samsung's font, which has no bold, and each makes its
     // own fake bold for the headings (weight 800); Noto Sans CJK JP has the real weights in both.
-    // The title translation is at the normal weight.
+    // Lines are as tall as the CSS line-height, with the text in the middle (see PageText).
+    val cssLines = LineHeightStyle(alignment = LineHeightStyle.Alignment.Center, trim = LineHeightStyle.Trim.None)
     val bodyStyle = TextStyle(
         fontFamily = text.bodyFont,
         fontSize = px(body),
         lineHeight = px(body * (LINE_HEIGHT_BASE_TENTHS + text.lineHeightStep) / 10f),
         letterSpacing = 0.sp,
+        lineHeightStyle = cssLines,
     )
     val titleStyle = TextStyle(
         fontFamily = text.headlineFont,
@@ -265,6 +271,7 @@ private fun ArticlePreviewPage(
         lineHeight = px(text.titleFontSize * 1.2f),
         letterSpacing = 0.sp,
         fontWeight = FontWeight.ExtraBold,
+        lineHeightStyle = cssLines,
     )
     val layoutDirection = LocalLayoutDirection.current
     // The page draws under the toolbar and starts with a spacer of the top padding minus 40dp
@@ -288,36 +295,35 @@ private fun ArticlePreviewPage(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         ) {
-            Text(
+            PageText(
                 text = preview.title.orEmpty(),
                 style = titleStyle,
                 maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
             )
             preview.translatedTitle?.let {
-                // As the translation under the title in the page (.__ff_tr): a rule on the left, a quieter colour.
-                // The page shows it at the normal weight.
-                Text(
+                // As the translation under the title in the page (h1 + .__ff_tr): bold, a 3px rule on
+                // the left and 0.7em after it, a quieter colour, 1em below (then the site name's 1.33em).
+                PageText(
                     text = it,
                     style = bodyStyle,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
                     maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .padding(bottom = with(density) { (body * 0.65f).dp })
+                        .padding(bottom = body.dp)
                         .drawBehind {
                             drawRect(Color(0x8C808080), size = Size(3.dp.toPx(), size.height))
                         }
-                        .padding(start = with(density) { (body * 0.7f).dp }),
+                        .padding(start = 3.dp + (body * 0.7f).dp),
                 )
             }
-            Text(
+            PageText(
                 text = preview.feedTitle,
-                style = bodyStyle.copy(fontFamily = text.headlineFont),
+                // h4 in the page: the headline font at the body size, line height 1.2.
+                style = bodyStyle.copy(fontFamily = text.headlineFont, lineHeight = px(body * 1.2f)),
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(vertical = with(density) { (body * 1.33f).dp }),
             )
             preview.imageUrl?.let {
@@ -332,16 +338,55 @@ private fun ArticlePreviewPage(
                 )
             }
             preview.summary?.let {
-                Text(
+                PageText(
                     text = it,
                     style = bodyStyle,
                     maxLines = 14,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = with(density) { body.dp }),
+                    // A paragraph's 1em margin after the image's; after the site name, it merges
+                    // into the site name's larger margin.
+                    modifier = Modifier.padding(top = if (preview.imageUrl != null) body.dp else 0.dp),
                 )
             }
         }
     }
+}
+
+/**
+ * Text laid out like a block in the reader page. The browser breaks lines greedily and makes every
+ * line box exactly the CSS line-height, even when the font is taller (Noto Sans CJK is 1.45 em);
+ * Compose balances the lines and lets the first and last line keep the font's own height, which
+ * pushed everything below down by a few dp. The box here is the line count times the line height.
+ */
+@Composable
+private fun PageText(
+    text: String,
+    style: TextStyle,
+    maxLines: Int,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontWeight: FontWeight? = null,
+) {
+    val lineCount = remember { IntArray(1) }
+    val lineHeightPx = with(LocalDensity.current) { style.lineHeight.toPx() }
+    Text(
+        text = text,
+        style = style.copy(lineBreak = LineBreak.Simple),
+        color = color,
+        fontWeight = fontWeight,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { lineCount[0] = it.lineCount },
+        modifier = modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            val height = (lineCount[0] * lineHeightPx).roundToInt()
+            // Compose centres each line in its line height, as CSS does, but the first and last
+            // lines keep the font's height, half the extra on each: drop it at both ends.
+            val firstLineExtra = placeable.height - height
+            layout(placeable.width, height) {
+                placeable.place(0, -firstLineExtra / 2)
+            }
+        },
+    )
 }
 
 private const val LINE_HEIGHT_BASE_TENTHS = 15
