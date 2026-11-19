@@ -291,7 +291,8 @@ private fun ArticlePreviewPage(
         Column(
             modifier = Modifier
                 .padding(horizontal = 8.dp)
-                .widthIn(max = 700.dp)
+                // The page's max-width of 700px is for the text: its 16px padding is outside it.
+                .widthIn(max = (700 + 16 * 2).dp)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
         ) {
