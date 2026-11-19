@@ -245,7 +245,9 @@ private fun ArticlePreviewPage(
     // CSS px are dp in the page; dp.toSp keeps them dp whatever the system font scale.
     fun px(value: Float) = with(density) { value.dp.toSp() }
     val body = text.fontSize.toFloat()
-    // The app's text styles add letter spacing; the page has none.
+    // The app's text styles add letter spacing; the page has none. The fonts are the app's own: on
+    // this phone the WebView also draws Japanese with the font the system list gives (Samsung's,
+    // 0.95 em wide), so the glyphs and widths match. Headings are bold, the title translation is not.
     val bodyStyle = TextStyle(
         fontSize = px(body),
         lineHeight = px(body * (LINE_HEIGHT_BASE_TENTHS + text.lineHeightStep) / 10f),
@@ -288,10 +290,10 @@ private fun ArticlePreviewPage(
             )
             preview.translatedTitle?.let {
                 // As the translation under the title in the page (.__ff_tr): a rule on the left, a quieter colour.
+                // The page shows it at the normal weight.
                 Text(
                     text = it,
                     style = bodyStyle,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
