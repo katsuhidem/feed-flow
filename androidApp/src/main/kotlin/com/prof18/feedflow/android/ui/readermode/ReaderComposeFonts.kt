@@ -1,5 +1,8 @@
 package com.prof18.feedflow.android.ui.readermode
 
+import android.graphics.fonts.SystemFonts
+import android.os.Build
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -32,6 +35,7 @@ internal fun rememberReaderFontFamily(family: ReaderFontFamily): FontFamily {
 }
 
 private fun loadReaderFontFamily(cacheDir: File, family: ReaderFontFamily): FontFamily? {
+    if (family.isDeviceFont) return deviceFontFile(family)?.let(::variableFontFamily)
     val fileName = family.fileName ?: return FontFamily.Default
     val fontFile = File(cacheDir, "reader-fonts/$fileName")
     if (!fontFile.exists()) {
@@ -42,9 +46,14 @@ private fun loadReaderFontFamily(cacheDir: File, family: ReaderFontFamily): Font
         stream.use { input -> tempFile.outputStream().use { input.copyTo(it) } }
         tempFile.renameTo(fontFile)
     }
-    // Pinning the variable font's weight axis renders the real weight instead of a synthetic bold.
-    return FontFamily(
-        listOf(FontWeight.Normal, FontWeight.Bold).map { weight ->
+    return variableFontFamily(fontFile)
+}
+
+// Pinning the variable font's weight axis renders the real weight instead of a synthetic bold.
+// fork (Phase 4i): ExtraBold too, the weight of the reader page's headings.
+private fun variableFontFamily(fontFile: File): FontFamily =
+    FontFamily(
+        listOf(FontWeight.Normal, FontWeight.Bold, FontWeight.ExtraBold).map { weight ->
             Font(
                 file = fontFile,
                 weight = weight,
@@ -52,6 +61,26 @@ private fun loadReaderFontFamily(cacheDir: File, family: ReaderFontFamily): Font
             )
         },
     )
+
+/**
+ * fork (Phase 4i): the system file of a font the phone already has. Compose opens the first face of
+ * a collection, so the font must be that face (Noto Sans CJK puts Japanese first).
+ */
+private fun deviceFontFile(family: ReaderFontFamily): File? {
+    val name = family.deviceFontName ?: return null
+    val listed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        SystemFonts.getAvailableFonts().firstOrNull { font ->
+            font.ttcIndex == 0 && font.file?.name?.startsWith("NotoSansCJK") == true &&
+                (0 until font.localeList.size()).any { font.localeList[it].language == "ja" }
+        }?.file
+    } else {
+        null
+    }
+    val file = listed ?: File("/system/fonts/NotoSansCJK-Regular.ttc").takeIf { it.exists() }
+    Log.d(TAG, "device font $name: ${file?.name ?: "not found"} (listed=${listed != null})")
+    return file
 }
+
+private const val TAG = "ReaderFont"
 
 private object ReaderFontAnchor

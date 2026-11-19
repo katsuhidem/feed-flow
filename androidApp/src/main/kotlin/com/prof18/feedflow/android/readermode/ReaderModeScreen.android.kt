@@ -81,6 +81,7 @@ import com.multiplatform.webview.web.WebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import com.multiplatform.webview.web.rememberWebViewStateWithHTMLData
+import com.prof18.feedflow.android.ui.readermode.rememberReaderFontFamily
 import com.prof18.feedflow.android.AudioUrlOpener
 import com.prof18.feedflow.android.BrowserManager
 import com.prof18.feedflow.android.audio.AndroidAudioPlayer
@@ -355,7 +356,13 @@ internal fun ReaderModeScreen(
                     swipeState = swipeState,
                     neighbors = readerNeighbors,
                     contentPadding = contentPadding,
-                    text = ReaderPreviewText(fontSize = fontSize, lineHeightStep = lineHeight, titleFontSize = titleFontSize),
+                    text = ReaderPreviewText(
+                        fontSize = fontSize,
+                        lineHeightStep = lineHeight,
+                        titleFontSize = titleFontSize,
+                        bodyFont = rememberReaderFontFamily(bodyFont),
+                        headlineFont = rememberReaderFontFamily(headlineFont),
+                    ),
                     onNavigate = { next -> if (next) onNavigateToNext() else onNavigateToPrevious() },
                 ) {
                 when (readerModeState) {
@@ -913,6 +920,16 @@ private fun ReaderMode(
     LaunchedEffect(pageLoaded, shownArticleId) {
         if (pageLoaded) onPageShown(shownArticleId)
     }
+    // fork (Phase 4i): whether the page found the phone's own font (CSS local()).
+    LaunchedEffect(pageLoaded, shownArticleId, bodyFont, headlineFont) {
+        val deviceFont = listOf(headlineFont, bodyFont).firstOrNull { it.isDeviceFont }
+        if (pageLoaded && deviceFont != null) {
+            delay(DEVICE_FONT_CHECK_DELAY_MS)
+            navigator.evaluateJavaScript(
+                "document.fonts.check('800 16px \"${deviceFont.cssFamilyName}\"', '\u3042')",
+            ) { loaded -> Logger.d { "ReaderFont: page device font loaded=$loaded" } }
+        }
+    }
     LaunchedEffect(translation) {
         translation?.jsCommands?.collect { script -> navigator.evaluateJavaScript(script) }
     }
@@ -1071,3 +1088,5 @@ private fun ReaderVerificationMessage(verificationFailed: Boolean, modifier: Mod
             .padding(horizontal = 16.dp),
     )
 }
+
+private const val DEVICE_FONT_CHECK_DELAY_MS = 800L

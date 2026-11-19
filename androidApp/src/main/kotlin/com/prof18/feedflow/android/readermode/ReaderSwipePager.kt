@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,6 +81,9 @@ internal data class ReaderPreviewText(
     val fontSize: Int,
     val lineHeightStep: Int,
     val titleFontSize: Int,
+    /** The reader's fonts: the body for the text, the headline for the title and the feed name (h1, h4). */
+    val bodyFont: FontFamily = FontFamily.Default,
+    val headlineFont: FontFamily = FontFamily.Default,
 )
 
 /**
@@ -245,15 +249,18 @@ private fun ArticlePreviewPage(
     // CSS px are dp in the page; dp.toSp keeps them dp whatever the system font scale.
     fun px(value: Float) = with(density) { value.dp.toSp() }
     val body = text.fontSize.toFloat()
-    // The app's text styles add letter spacing; the page has none. The fonts are the app's own: on
-    // this phone the WebView also draws Japanese with the font the system list gives (Samsung's,
-    // 0.95 em wide), so the glyphs and widths match. Headings are bold, the title translation is not.
+    // The app's text styles add letter spacing; the page has none. The fonts are the reader's: with
+    // the system font, both draw Japanese with Samsung's font, which has no bold, and each makes its
+    // own fake bold for the headings (weight 800); Noto Sans CJK JP has the real weights in both.
+    // The title translation is at the normal weight.
     val bodyStyle = TextStyle(
+        fontFamily = text.bodyFont,
         fontSize = px(body),
         lineHeight = px(body * (LINE_HEIGHT_BASE_TENTHS + text.lineHeightStep) / 10f),
         letterSpacing = 0.sp,
     )
     val titleStyle = TextStyle(
+        fontFamily = text.headlineFont,
         fontSize = px(text.titleFontSize.toFloat()),
         lineHeight = px(text.titleFontSize * 1.2f),
         letterSpacing = 0.sp,
@@ -307,7 +314,7 @@ private fun ArticlePreviewPage(
             }
             Text(
                 text = preview.feedTitle,
-                style = bodyStyle,
+                style = bodyStyle.copy(fontFamily = text.headlineFont),
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

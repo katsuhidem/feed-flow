@@ -52,6 +52,9 @@
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/DateFormatterImpl.kt` | Phase 4g: 日本式の組み立て(「11/16 15:35」「2025/7/8 19:30」)。「最後の同期」を年が先の「2026/11/16 21:33:06」の形にした(全員に効く) | 4g |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/feedlist/FeedListSettingsScreenContent.kt` | Phase 4g: 日付表記の選択肢に「日本式(11/16)」 | 4g |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/settings/FeedListFontSettings.kt` | Phase 4g: 設定のプレビューの日付に日本式 | 4g |
+| `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/ReaderFontFamily.kt` | Phase 4i: 端末にあるフォントを使う選択肢 `NOTO_SANS_CJK_JP`(`deviceFontName`、`isDeviceFont`)。`isBundled` をファイルの有無で決めるようにした | 4i |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/readerfont/ReaderFontFaceCss.kt` | Phase 4i: 端末にあるフォントの `@font-face`(`src: local(...)`) | 4i |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/readermode/ReaderComposeFonts.kt` | Phase 4i: 端末にあるフォントのファイルを探して読む。太さに ExtraBold(見出しの 800)を足した | 4i |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/ArticleNavigationRepository.kt` | Phase 4i: リーダーを開いてから閉じるまで、開いた時点の一覧の並び(読む順)で前後の記事を決める。終わりの近くでは一覧の次のページを読み込んで足す。既読の記事を一覧に出さない設定で、同期などの読み込み直しの後に前後へ移れなくなる上流の問題を直す | 4i |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。

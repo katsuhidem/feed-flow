@@ -32,6 +32,15 @@ class ReaderFontFaceCssJvmTest {
     }
 
     @Test
+    fun `device font declares a local face with its weight range`() {
+        val css = readerFontFaceCss(ReaderFontFamily.NOTO_SANS_CJK_JP)
+
+        assertTrue(css.contains("src: local('NotoSansCJKJP-Regular')"))
+        assertTrue(css.contains("font-weight: 400 900"))
+        assertEquals(1, css.fontFaceCount())
+    }
+
+    @Test
     fun `every bundled font file is on the classpath`() {
         ReaderFontFamily.entries.filter { it.isBundled }.forEach { family ->
             listOfNotNull(family.fileName, family.italicFileName).forEach { fileName ->

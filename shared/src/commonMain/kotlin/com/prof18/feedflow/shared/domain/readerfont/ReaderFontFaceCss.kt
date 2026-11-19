@@ -11,13 +11,24 @@ private val fontFaceCssByFamily: Map<ReaderFontFamily, Lazy<String>> =
     ReaderFontFamily.entries.associateWith { family -> lazy { buildFontFaceCss(family) } }
 
 fun readerFontFaceCss(vararg families: ReaderFontFamily): String =
-    families.filter { it.isBundled }.distinct()
+    families.filter { it.isBundled || it.isDeviceFont }.distinct()
         .joinToString("\n") { fontFaceCssByFamily.getValue(it).value }
 
 private fun buildFontFaceCss(family: ReaderFontFamily): String = listOfNotNull(
+    family.deviceFontName?.let { deviceFontFace(family, it) },
     family.fileName?.let { fontFace(family, it, "normal") },
     family.italicFileName?.let { fontFace(family, it, "italic") },
 ).joinToString("\n")
+
+// fork (Phase 4i): the font comes from the phone's own files, by its PostScript name.
+private fun deviceFontFace(family: ReaderFontFamily, name: String): String = """
+    @font-face {
+        font-family: '${family.cssFamilyName}';
+        src: local('$name');
+        font-weight: ${family.cssWeightRange};
+        font-style: normal;
+    }
+""".trimIndent()
 
 private fun fontFace(family: ReaderFontFamily, fileName: String, style: String): String? {
     val bytes = readReaderFontBytes(fileName) ?: return null
