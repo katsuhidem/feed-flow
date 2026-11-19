@@ -1,6 +1,7 @@
 package com.prof18.feedflow.shared.domain.feed
 
 import com.prof18.feedflow.core.model.FeedItem
+import com.prof18.feedflow.core.model.FeedItemId
 import com.prof18.feedflow.core.model.FeedOrder
 import com.prof18.feedflow.database.DatabaseHelper
 import com.prof18.feedflow.shared.data.FeedAppearanceSettingsRepository
@@ -186,6 +187,51 @@ class ArticleNavigationRepositoryTest : KoinTestBase() {
 
         assertEquals(items[36].id, next?.id)
         assertEquals(40, feedStateRepository.feedState.value.size)
+    }
+
+    // fork (Phase 4i)
+    @Test
+    fun `while reading, the order stays as the timeline was when the reader opened`() = runTest(testDispatcher) {
+        val items = seedItems(count = 4, prefix = "reading")
+        val (a, b, c, d) = items
+        articleNavigationRepository.beginReadingSession()
+
+        // b and c are read; a reload without read articles drops them from the timeline.
+        databaseHelper.updateReadStatus(listOf(FeedItemId(b.id), FeedItemId(c.id)), isRead = true)
+        settingsRepository.setShowReadArticlesTimeline(false)
+        feedStateRepository.getFeeds()
+        assertEquals(listOf(a.id, d.id), feedStateRepository.feedState.value.map { it.id })
+
+        // From c (gone from the timeline) and from d (still there), the neighbours are as read.
+        assertEquals(d.id, articleNavigationRepository.getNextArticle(c.id)?.id)
+        assertEquals(b.id, articleNavigationRepository.getPreviousArticle(c.id)?.id)
+        assertEquals(c.id, articleNavigationRepository.getPreviousArticle(d.id)?.id)
+        assertEquals(ArticlePosition(currentPosition = 4, totalArticles = 4), articleNavigationRepository.getArticlePosition(d.id))
+        assertNull(articleNavigationRepository.getNextArticle(d.id))
+
+        // After the reader closes, the timeline decides again.
+        articleNavigationRepository.endReadingSession()
+        assertEquals(a.id, articleNavigationRepository.getPreviousArticle(d.id)?.id)
+        assertNull(articleNavigationRepository.getNextArticle(c.id))
+    }
+
+    @Test
+    fun `past the end of the reading order the timeline continues and is kept`() = runTest(testDispatcher) {
+        val items = seedItems(count = 45, prefix = "readpaged")
+        assertEquals(40, feedStateRepository.feedState.value.size)
+        articleNavigationRepository.beginReadingSession()
+
+        assertEquals(items[40].id, articleNavigationRepository.getNextArticle(items[39].id)?.id)
+        assertEquals(items[41].id, articleNavigationRepository.getNextArticle(items[40].id)?.id)
+        assertEquals(items[39].id, articleNavigationRepository.getPreviousArticle(items[40].id)?.id)
+    }
+
+    @Test
+    fun `an article outside the reading order uses the timeline`() = runTest(testDispatcher) {
+        val items = seedItems(count = 3, prefix = "outside")
+        articleNavigationRepository.beginReadingSession()
+        assertNull(articleNavigationRepository.getPreviousArticle("not-in-order"))
+        assertEquals(items[0].id, articleNavigationRepository.getPreviousArticle(items[1].id)?.id)
     }
 
     private suspend fun seedItems(count: Int, prefix: String): List<FeedItem> {

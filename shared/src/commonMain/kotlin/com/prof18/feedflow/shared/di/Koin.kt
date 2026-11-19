@@ -35,6 +35,7 @@ import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetchReposito
 import com.prof18.feedflow.shared.domain.contentprefetch.ContentPrefetcher
 import com.prof18.feedflow.shared.domain.feed.ArticleNavigationRepository
 import com.prof18.feedflow.shared.domain.feed.DuplicateReadMarker
+import com.prof18.feedflow.shared.domain.feed.ReaderNeighbors
 import com.prof18.feedflow.shared.domain.feed.FeedActionsRepository
 import com.prof18.feedflow.shared.domain.feed.FeedFetcherRepository
 import com.prof18.feedflow.shared.domain.feed.FeedFontSizeRepository
@@ -680,6 +681,9 @@ private fun getCoreModule(appConfig: AppConfig) = module {
     single {
         ArticleNavigationRepository(feedStateRepository = get())
     }
+
+    // fork (Phase 4i)
+    single { ReaderNeighbors(navigation = get()) }
 
     single {
         FeedRecoveryRepository(

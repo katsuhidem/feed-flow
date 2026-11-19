@@ -4,7 +4,7 @@ import co.touchlab.kermit.Logger
 import com.prof18.feedflow.android.translation.ArticleTranslationViewModel
 import com.prof18.feedflow.android.datause.DataUseSetup
 import com.prof18.feedflow.android.notion.canShareToNotion
-import com.prof18.feedflow.shared.domain.readerSwipeEnterHtml
+import com.prof18.feedflow.shared.domain.feed.ReaderNeighbors
 import com.prof18.feedflow.android.notion.shareToNotion
 import com.prof18.feedflow.android.datause.LoadImagesButton
 import com.prof18.feedflow.android.datause.applyMediaBlock
@@ -173,8 +173,14 @@ internal fun ReaderModeScreen(
     val fontScriptScope = rememberCoroutineScope()
     val fontScriptJob = remember { mutableStateOf<Job?>(null) }
     val showingFallbackWebsite = readerModeState.showsFallbackWebsite(verificationState)
-    // fork (Phase 4f): the direction a swiped-to article slides in from, used once by the next page
-    val swipeEnter = remember { arrayOfNulls<Boolean>(1) }
+    // fork (Phase 4i): articles side by side while swiping
+    val swipeState = remember { ReaderSwipeState() }
+    val readerNeighbors = koinInject<ReaderNeighbors>()
+    DisposableEffect(readerNeighbors) {
+        readerNeighbors.beginReadingSession()
+        onDispose { readerNeighbors.endReadingSession() }
+    }
+    var shownPageId by remember { mutableStateOf<String?>(null) }
     // fork (Phase 4a): images and video are held back on mobile connections until the user asks for them
     val dataUse = koinInject<DataUseSetup>()
     val mediaBlock = rememberReaderMediaBlock(
@@ -341,6 +347,16 @@ internal fun ReaderModeScreen(
                     )
                 }
 
+                // fork (Phase 4i): the article and its neighbours side by side while swiping
+                ReaderSwipePager(
+                    currentId = (readerModeState as? ReaderModeState.Success)?.readerModeData?.id?.id,
+                    shownId = shownPageId,
+                    enabled = readerModeState is ReaderModeState.Success && !showingFallbackWebsite,
+                    swipeState = swipeState,
+                    neighbors = readerNeighbors,
+                    contentPadding = contentPadding,
+                    onNavigate = { next -> if (next) onNavigateToNext() else onNavigateToPrevious() },
+                ) {
                 when (readerModeState) {
                     is ReaderModeState.ContentNotAvailable -> {
                         ReaderFallbackContent(
@@ -379,19 +395,9 @@ internal fun ReaderModeScreen(
                             readerModeState = readerModeState,
                             translation = translationViewModel,
                             mediaBlocked = mediaBlock.blocked,
-                            // fork (Phase 4f): the same moves as the toolbar's previous and next buttons
-                            canSwipePrevious = canNavigatePrevious,
-                            canSwipeNext = canNavigateNext,
-                            consumeSwipeEnter = { swipeEnter[0].also { swipeEnter[0] = null } },
-                            onSwipeNavigate = { next ->
-                                val can = if (next) canNavigateNext else canNavigatePrevious
-                                Logger.withTag("ReaderSwipe").i { "swipe ${if (next) "next" else "previous"} available=$can" }
-                                if (can) {
-                                    swipeEnter[0] = next
-                                    if (next) onNavigateToNext() else onNavigateToPrevious()
-                                }
-                                can
-                            },
+                            // fork (Phase 4i)
+                            onSwipeTouch = swipeState::onPageTouch,
+                            onPageShown = { shownPageId = it },
                             openInBrowser = { url ->
                                 if (isValidUrl(url)) {
                                     browserManager.openUrlWithFavoriteBrowser(url, context)
@@ -423,6 +429,7 @@ internal fun ReaderModeScreen(
                             ),
                         )
                     }
+                }
                 }
                 if (hasVerificationMessage) {
                     ReaderVerificationMessage(
@@ -699,13 +706,10 @@ private fun ReaderMode(
     translation: ArticleTranslationViewModel? = null,
     // fork (Phase 4a)
     mediaBlocked: Boolean = false,
-    // fork (Phase 4f): a swipe on the page; true for the next article, false for the previous one.
-    // Returns false when it did not move to another article.
-    onSwipeNavigate: (next: Boolean) -> Boolean = { false },
-    canSwipePrevious: Boolean = false,
-    canSwipeNext: Boolean = false,
-    /** True when this page was opened by a swipe to the next article, false to the previous one; read once. */
-    consumeSwipeEnter: () -> Boolean? = { null },
+    // fork (Phase 4i): whether a sideways drag from the touched place belongs to the page
+    onSwipeTouch: (blocked: Boolean) -> Unit = {},
+    // fork (Phase 4i): the page of this article has finished loading
+    onPageShown: (articleId: String) -> Unit = {},
 ) {
     val bodyColor = MaterialTheme.colorScheme.onSurface.toArgb().toHexString().substring(2)
     val linkColor = MaterialTheme.colorScheme.primary.toArgb().toHexString().substring(2)
@@ -735,7 +739,7 @@ private fun ReaderMode(
     val latestPlayAudio by rememberUpdatedState(onPlayAudio)
     val latestAudioUrl by rememberUpdatedState(readerModeState.readerModeData.audioUrl)
     val latestOpenImage by rememberUpdatedState(onImageClick)
-    val latestSwipeNavigate by rememberUpdatedState(onSwipeNavigate)
+    val latestSwipeTouch by rememberUpdatedState(onSwipeTouch)
     val latestExpand by rememberUpdatedState(onExpandToolbar)
     val latestCollapse by rememberUpdatedState(onCollapseToolbar)
 
@@ -761,9 +765,7 @@ private fun ReaderMode(
             titleFontSize = titleFontSize,
             title = shownTitle,
             imageUrl = readerModeData.imageUrl,
-            leadingContent = "<div id=\"__feedflow_top_spacer\" style=\"height: ${spacerHeightDp}px;\"></div>" +
-                // fork (Phase 4f): a page opened by a swipe slides in
-                consumeSwipeEnter()?.let { readerSwipeEnterHtml(fromRight = it) }.orEmpty(),
+            leadingContent = "<div id=\"__feedflow_top_spacer\" style=\"height: ${spacerHeightDp}px;\"></div>",
             siteName = readerModeData.siteName,
             languageTag = readerModeData.languageTag,
             audioBanner = AudioEnclosure.validatedUrl(readerModeData.audioUrl)?.let {
@@ -855,7 +857,7 @@ private fun ReaderMode(
                 override fun methodName(): String = "translationPage"
             },
         )
-        // fork (Phase 4f): the page reports a horizontal swipe here
+        // fork (Phase 4i): at every touch, the page says whether a sideways drag there is its own
         jsBridge.register(
             object : IJsMessageHandler {
                 override fun handle(
@@ -863,14 +865,10 @@ private fun ReaderMode(
                     navigator: WebViewNavigator?,
                     callback: (String) -> Unit,
                 ) {
-                    bridgeScope.launch(Dispatchers.Main.immediate) {
-                        if (!latestSwipeNavigate(message.params == "next")) {
-                            navigator?.evaluateJavaScript("window.feedflowSwipe && window.feedflowSwipe.back();")
-                        }
-                    }
+                    latestSwipeTouch(message.params == "blocked")
                 }
 
-                override fun methodName(): String = "articleSwipe"
+                override fun methodName(): String = "swipeTouch"
             },
         )
     }
@@ -910,13 +908,9 @@ private fun ReaderMode(
             navigator.evaluateJavaScript("window.feedflowTranslation && window.feedflowTranslation.ping();")
         }
     }
-    // fork (Phase 4f): tell the page where a swipe can go
-    LaunchedEffect(pageLoaded, shownArticleId, canSwipePrevious, canSwipeNext) {
-        if (pageLoaded) {
-            navigator.evaluateJavaScript(
-                "window.feedflowSwipe && window.feedflowSwipe.setAvailable($canSwipePrevious, $canSwipeNext);",
-            )
-        }
+    // fork (Phase 4i): the preview of an article moved to by a swipe stays in front until this
+    LaunchedEffect(pageLoaded, shownArticleId) {
+        if (pageLoaded) onPageShown(shownArticleId)
     }
     LaunchedEffect(translation) {
         translation?.jsCommands?.collect { script -> navigator.evaluateJavaScript(script) }

@@ -17,7 +17,7 @@
 | `settings.gradle.kts` | `:translation` と `:llama` を `include` | 2 |
 | `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/FeedItem.kt` | `translatedTitle` を追加(既定値 null) | 2 |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/FeedStateRepository.kt` | `titleTranslations` 引数を追加。一覧を公開する前に訳題を埋め(`withTitleTranslations`)、通知で差し替える(`init`) | 2 |
-| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `FeedStateRepository` に `getOrNull<TimelineTitleTranslations>()` を渡す | 2 |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `FeedStateRepository` に `getOrNull<TimelineTitleTranslations>()` を渡す。Phase 4i: `ReaderNeighbors` を登録 | 2、4i |
 | `androidApp/build.gradle.kts` | `:translation` と `:database` への依存、`ndkVersion` を追加 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TranslationSetup` を作り、Koin モジュールを渡し、起動後に `install()` | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/home/components/list/FeedItemCommon.kt` | 訳題があれば主に表示し、原題を下に小さく表示(`OriginalTitle`) | 2 |
@@ -26,8 +26,8 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/feed/editfeed/EditFeedComponents.kt` | `EditFeedContent` に `extraSettings` 引数を追加 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/editfeed/EditFeedScreen.android.kt` | `EditScreen` に `feedId` 引数を追加し、フィード別の翻訳設定を表示 | 2 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/MainActivity.kt` | `EditScreen` に `feedId` を渡す | 2 |
-| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/ReaderModeHtmlAndCss.kt` | 翻訳用の CSS と JavaScript を読み込む2か所(`readerTranslationCss()`、`readerTranslationJs()`)。Phase 4f: スワイプの JavaScript(`readerSwipeJs`)と CSS(`readerSwipeCss`)を1行ずつ読み込む | 3、4f |
-| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える。Phase 4a: 画像と動画の読み込みの制御(`applyMediaBlock`)、ツールバーの「画像を読み込む」ボタン、画像ビューアで開く画像の許可。Phase 4d: Notion アプリが入っているときに、ツールバーへ Notion への共有の処理を渡す。Phase 4f: JS ブリッジのハンドラ `articleSwipe`、前後に移れるかをページへ知らせる処理、スワイプで開いたページを滑り込ませる指定(`leadingContent` に足す) | 3、4a、4d、4f |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/ReaderModeHtmlAndCss.kt` | 翻訳用の CSS と JavaScript を読み込む2か所(`readerTranslationCss()`、`readerTranslationJs()`)。Phase 4f: スワイプの JavaScript(`readerSwipeJs`)と CSS(`readerSwipeCss`)を1行ずつ読み込む。Phase 4i: スワイプの CSS の読み込みを外した(JavaScript は指を置いた場所の判定だけ) | 3、4f、4i |
+| `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeScreen.android.kt` | 翻訳用 ViewModel の取得、ツールバーへのボタン、JS ブリッジのハンドラ `translationBlocks`、ページ読み込み完了の通知と JS コマンドの実行。debug ビルドでは、検証用のスイッチがオンのとき、本文とタイトルを確認用の記事(`TranslationDebug`)に差し替える。Phase 4a: 画像と動画の読み込みの制御(`applyMediaBlock`)、ツールバーの「画像を読み込む」ボタン、画像ビューアで開く画像の許可。Phase 4d: Notion アプリが入っているときに、ツールバーへ Notion への共有の処理を渡す。Phase 4f: JS ブリッジのハンドラ `articleSwipe`、前後に移れるかをページへ知らせる処理、スワイプで開いたページを滑り込ませる指定(`leadingContent` に足す)。Phase 4i: 本文の部分を `ReaderSwipePager` で包み、前後の記事のプレビューを並べて動かす。Phase 4f の滑り込みの指定と `articleSwipe` を外し、JS ブリッジ `swipeTouch` と、ページの読み込み完了の通知、読む順の始まりと終わり(`beginReadingSession` など)を足した | 3、4a、4d、4f、4i |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeToolbar.kt` | `actions` 引数を追加 | 3 |
 | `androidApp/build.gradle.kts` | `:tailnet`、`:feedSync:networkcore`、tsbridge の AAR(`tailnet/libs/tsbridge-0.1.0.aar`)、`ktor-client-okhttp` への依存を追加 | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/FeedFlowApp.kt` | `TailnetSetup` を作り、GReader 用エンジンと Koin モジュールを `initKoin` に渡す。Koin 起動後に `install()`。画像ローダーに tailnet 用の OkHttp を渡す。Phase 4a: 通信量の制御の組み立て(`DataUseSetup`)を起動時に作る1行、Koin モジュールと画像ローダー用のインターセプタ(`imageInterceptor`)を渡す | 1、4a |
@@ -35,7 +35,7 @@
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/accounts/freshrss/FreshRssSyncScreen.android.kt` | Tailscale の欄を表示し、ログイン時に入力された URL を tailnet の対象にする | 1 |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/accounts/freshrss/FreshRssSyncComponents.kt` | `FreshRssSyncContent` に `headerContent` 引数を追加 | 1 |
 | `feedSync/greader/src/commonMain/kotlin/com/prof18/feedflow/feedsync/greader/di/GReaderModule.kt` | `getGReaderModule` に `httpClientEngine` 引数を追加し、`GReaderClient` に渡す | 1 |
-| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `initKoin` と `getAllModulesModules` に `greaderHttpEngine` 引数を追加 | 1 |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | `initKoin` と `getAllModulesModules` に `greaderHttpEngine` 引数を追加。Phase 4i: `ReaderNeighbors` を登録 | 1、4i |
 | `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/domain/FeedDownloadWorker.kt` | `syncNetworkGate` 引数を追加し、取得を `withNetwork` で包む | 1 |
 | `shared/src/androidMain/kotlin/com/prof18/feedflow/shared/di/KoinAndroid.kt` | `FeedDownloadWorker` に `getOrNull<SyncNetworkGate>()` を渡す | 1 |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/contentprefetch/ContentPrefetcher.kt` | Phase 4a: 各記事の取得の直前に `ContentPrefetchGate` を確かめる。止められたら取得せず、待ち行列に残したまま `false` を返す(`prefetch` の戻り値を `Boolean` にした) | 4a |
@@ -46,12 +46,13 @@
 | `i18n/build.gradle.kts` | Phase 4b: 文字列を生成する KSP の処理に、言語ファイルのフォルダを入力として登録した(登録しないと、言語ファイルを変えても生成し直されない) | 4b |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/readermode/ReaderModeFloatingToolbar.kt` | Phase 4c: 「記事を読み上げる」と「壊れた記事を報告」のボタンを並べる行を外した(処理そのものは残っている)。Phase 4d: 「Notionに保存」のボタン(引数 `onShareToNotion` を渡したときだけ出す) | 4c、4d |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/FeedFetcherRepository.kt` | Phase 4e: 引数 `duplicateReadMarker` を足し、同期の後(FreshRSS は同期が成功したときだけ)に重複の判定を呼ぶ | 4e |
-| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | Phase 4e: `DuplicateReadMarker` を登録し、`FeedFetcherRepository` に渡す | 4e |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/di/Koin.kt` | Phase 4e: `DuplicateReadMarker` を登録し、`FeedFetcherRepository` に渡す。Phase 4i: `ReaderNeighbors` を登録 | 4e、4i |
 | `database/src/commonMain/kotlin/com/prof18/feedflow/database/DatabaseHelper.kt` | Phase 4e: 重複の判定に使う記事の一覧を読むメソッド `getDuplicateReadRows`。Phase 4h: 記事のフィードを引くメソッド `getFeedSourceIdOf` | 4e、4h |
 | `core/src/commonMain/kotlin/com/prof18/feedflow/core/model/DateFormat.kt` | Phase 4g: 日付表記の選択肢に `JAPANESE` を足した | 4g |
 | `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/DateFormatterImpl.kt` | Phase 4g: 日本式の組み立て(「11/16 15:35」「2025/7/8 19:30」)。「最後の同期」を年が先の「2026/11/16 21:33:06」の形にした(全員に効く) | 4g |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/settings/feedlist/FeedListSettingsScreenContent.kt` | Phase 4g: 日付表記の選択肢に「日本式(11/16)」 | 4g |
 | `androidApp/src/main/kotlin/com/prof18/feedflow/android/ui/settings/FeedListFontSettings.kt` | Phase 4g: 設定のプレビューの日付に日本式 | 4g |
+| `shared/src/commonMain/kotlin/com/prof18/feedflow/shared/domain/feed/ArticleNavigationRepository.kt` | Phase 4i: リーダーを開いてから閉じるまで、開いた時点の一覧の並び(読む順)で前後の記事を決める。終わりの近くでは一覧の次のページを読み込んで足す。既読の記事を一覧に出さない設定で、同期などの読み込み直しの後に前後へ移れなくなる上流の問題を直す | 4i |
 
 `namespace`(`com.prof18.feedflow.android`)とKotlinのパッケージ名は変えていない。
 

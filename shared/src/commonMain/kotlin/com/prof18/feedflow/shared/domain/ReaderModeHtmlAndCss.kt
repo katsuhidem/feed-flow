@@ -49,7 +49,6 @@ fun getReaderModeStyledHtml(
     <style>
       ${readerModeCss(colors, fontSize, lineHeight, bodyFont, headlineFont, titleFontSize)}
       ${readerTranslationCss()}
-      ${readerSwipeCss()}
     </style>
     </head>
     <body>
