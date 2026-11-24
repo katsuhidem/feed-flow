@@ -1,6 +1,6 @@
 # AGENTS.md
 
-このリポジトリは prof18/feed-flow のタグ 1.21.0-fdroid から分岐した個人用のフォーク。上流には追随しない。
+このリポジトリは prof18/feed-flow のタグ 1.21.0-fdroid から分岐した個人用の独立コードベース。上流には追随しない。
 計画と決定の正本は docs/PLAN.md。計画と実際の状態が食い違う場合は、実装を進めずに docs/STATUS.md に書いて止まる。
 
 ## セッションの進め方
@@ -17,7 +17,7 @@
 - ビルドは fdroid フレーバーを使う: ./gradlew --quiet --console=plain :androidApp:assembleFdroidDebug
 - targetSdk は 36 のまま上げない。理由は docs/PLAN.md にある。
 - 動作確認は、adb devices に出る Galaxy Z Fold8 の実機で行う。
-- 上流の変更は、人が指定したコミットの cherry-pick でだけ取り込む。merge と rebase はしない。
+- 上流への git レベルの追従(merge、rebase、cherry-pick)はしない。既存ファイル・ViewModel・UI・DBスキーマも含め、上流との衝突回避を理由に設計を妥協せず、最も素直な形で直接変更してよい。
 - 上流(prof18/feed-flow)に、プルリクエスト、Issue、コメントを作らない。
 
 ## 人に戻す場面
