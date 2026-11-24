@@ -1,10 +1,10 @@
 # STATUS
 
-最終更新: 2026-11-24(エージェント。人の承認により上流追従・cherry-pick 前提を廃止し、docs/PLAN.md・AGENTS.md・FORK_CHANGES.md を更新、upstream リモートを削除。ブランチ docs/detach-upstream で作業)
+最終更新: 2026-11-24(エージェント。方針改定の docs/detach-upstream は main にマージ済み。次は Phase 4 の項目から、使ってみて不足を感じたものに着手する)
 
 ## 現在地
 
-- 方針改定(2026-11-24、ブランチ `docs/detach-upstream`、`phase/4k` 先頭 235d38fc5 から作成): 上流とのコンフリクト回避が修正方針を狭めている点を受け、人の承認のうえで上流追従(cherry-pick 前提)の制約を廃止した。`docs/PLAN.md` と `AGENTS.md` を改定し、既存ファイル・ViewModel・UI・DB スキーマも最も素直な設計になるよう直接変更してよい方針にした(`tailnet/`・`translation/` の KMP モジュール分離は iOS 対応と保守性のため維持)。`FORK_CHANGES.md` は Phase 4k までの記録として凍結し、ローカルの `upstream` リモートを削除した。コードの変更はなし
+- 方針改定(2026-11-24、ブランチ `docs/detach-upstream`、`phase/4k` 先頭 235d38fc5 から作成)は完了。人が `docs/detach-upstream` を `main` にマージした(`main` と `docs/detach-upstream` は `ce3c5c288` で一致。エージェントが `origin` で確認)。この STATUS の締めのコミットだけが、マージの後に `docs/detach-upstream` に載っている(文書だけ。次のフェーズのブランチはここから切る)。上流とのコンフリクト回避が修正方針を狭めている点を受け、人の承認のうえで上流追従(cherry-pick 前提)の制約を廃止した。`docs/PLAN.md` と `AGENTS.md` を改定し、既存ファイル・ViewModel・UI・DB スキーマも最も素直な設計になるよう直接変更してよい方針にした(`tailnet/`・`translation/` の KMP モジュール分離は iOS 対応と保守性のため維持)。`FORK_CHANGES.md` は Phase 4k までの記録として凍結し、ローカルの `upstream` リモートを削除した。コードの変更はなし
 - フェーズ: Phase 4k(Phase 4i の修正)は完了(2026-11-19)。人が phase/4k を main にマージした(main と phase/4k は 2e96c5c09 で一致。エージェントが origin で確認)。この STATUS の締めのコミットだけが、マージの後に phase/4k に載っている(文書だけ。次のフェーズのブランチはここから切る)。ブランチ phase/4k は phase/4j の先頭 12027f5dc から作成。人の指摘(2026-11-19)「プレビューの方が表示領域の横幅が小さい」(開いた画面で)
   - 原因: ページの本文とタイトルは `max-width: 700px` が文字の幅で、左右の 16px の余白はその外にある(content-box)。プレビューは余白を含めて 700dp に収めていたので、文字の幅が 668dp だった。閉じた画面では 700 に届かないので差が出なかった
   - 修正: プレビューの列の最大幅を 732dp(700 と左右の 16)にした(`ReaderSwipePager.kt`)
@@ -301,18 +301,17 @@
 
 ## 次の作業
 
-1. 人が `docs/detach-upstream` を `main` にマージする
-2. Phase 4(拡張)の各項目は、使ってみて不足を感じた順に着手する(PLAN)。どの項目から始めるかを人と決める
-3. 機会があれば、動画や埋め込みのある記事で、モバイル回線のときに止まることを見る(Phase 4a の未確認の点)
-4. 次のフェーズのブランチは、`docs/detach-upstream`(またはマージ後の `main`)から切る
+1. Phase 4(拡張)の各項目は、使ってみて不足を感じた順に着手する(PLAN)。どの項目から始めるかを人と決める
+2. 機会があれば、動画や埋め込みのある記事で、モバイル回線のときに止まることを見る(Phase 4a の未確認の点)
+3. 次のフェーズのブランチは、`docs/detach-upstream` の先頭(この STATUS の締めのコミット)から切る
 
 ## 人への依頼
 
-- `docs/detach-upstream` の内容を確認し、問題なければ `main` にマージしてください。
-- 日常で使ってみて気づいた点や、次に着手したい項目があれば知らせてください。
+- いま依頼していることはありません。日常で使ってみて気づいた点や、次に着手したい項目があれば知らせてください。
 
 ## 人からの連絡
 
+- 2026-11-24: `docs/detach-upstream` を `main` にマージした。
 - 2026-11-24: 上流追従の制約によりコンフリクトを気にするあまり修正方針が狭まっている点を問題視し、cherry-pick 前提の廃止・既存コードの直接変更の許可・`FORK_CHANGES.md` 凍結・`upstream` リモート削除の方針を承認。
 
 - 2026-11-14: Mac mini の停電後の自動起動(`autorestart`)はオフのままにする。
